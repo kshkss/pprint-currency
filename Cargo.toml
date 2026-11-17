@@ -1,0 +1,40 @@
+[package]
+name = "pprint-currency"
+version = "0.1.0"
+edition = "2021"
+description = "固定小数点の整数を、ロケールの書式（区切り・小数点・通貨記号）で高速に文字列にする"
+repository = "https://github.com/kshkss/pprint-currency"
+
+[features]
+# 速い経路（特殊化）の有無。どれを切っても出力は同じで、切った分は遅い経路（FBL 方式）で処理される。
+# 速い経路を通るのは「区切り方」「minimumGroupingDigits（区切る場合）」「小数桁数」がすべて有効なときだけ。
+# features は足し算なので、一部だけ使うなら default-features = false にして必要なものを並べる。
+default = [
+    "group-3", "group-indian",
+    "min-group-1", "min-group-2",
+    "currency-frac-0", "currency-frac-2",
+    "number-frac",
+]
+
+# 区切り方
+group-3 = []        # 3 桁区切り（3, 3）
+group-indian = []   # インド式（3, 2）
+group-2 = []        # 2 桁区切り（2, 2）
+
+# minimumGroupingDigits
+min-group-1 = []
+min-group-2 = []
+min-group-3 = []
+
+# 通貨の小数桁数
+currency-frac-0 = []
+currency-frac-2 = []
+currency-frac-3 = []
+
+# 数値の小数桁数（0〜8 桁をまとめて特殊化）
+number-frac = []
+
+[dependencies]
+
+[dev-dependencies]
+serde_json = "1"
