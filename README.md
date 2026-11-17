@@ -80,3 +80,36 @@ Node が持つ CLDR のバージョンと cldr-json のバージョンを揃え�
 （Node 22.23.4 は CLDR 48.0 で、cldr-json 48.2.0 と一致した。48.0.0 とは RSD の小数桁数が違った）。
 
 速度の目安: `cargo run --release --example bench`
+
+## Acknowledgements
+
+The integer-to-string conversion is based on the `branchlut` algorithm from
+[miloyip/itoa-benchmark](https://github.com/miloyip/itoa-benchmark) by Milo Yip.
+It uses comparison-based branching to determine the number of digits and a two-digit lookup table
+to write digits from the most significant end. The slow path (`count_digits` and `Fwd` in `src/kernel.rs`)
+is a port of its branching structure, and the fast path builds on the same idea, writing whole digit groups
+(2 / 2+1 / 2+2 digits) so that no per-digit separator check is needed.
+
+itoa-benchmark is distributed under the MIT License:
+
+```
+Copyright (C) 2014 Milo Yip
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```

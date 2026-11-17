@@ -1,4 +1,7 @@
-//! 書き出しの本体。固定小数点の整数を、グループ単位（2 / 2+1 / 2+2 … 桁）で
+//! 書き出しの本体。
+//! 桁数の判定と数字の書き出しは miloyip/itoa-benchmark の branchlut（MIT、Copyright (C) 2014 Milo Yip）を
+//! ベースにしている（README の Acknowledgements を参照）。
+//! 固定小数点の整数を、グループ単位（2 / 2+1 / 2+2 … 桁）で
 //! 区切りの判定なしに書き出す（FGR 方式）。数字は ASCII のみ。
 
 use crate::FormatError;
