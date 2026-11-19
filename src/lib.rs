@@ -120,7 +120,12 @@ macro_rules! common_impl {
                 Layout::new(
                     p.decimal,
                     p.group,
-                    [p.positive_prefix, p.positive_suffix, p.negative_prefix, p.negative_suffix],
+                    [
+                        p.positive_prefix,
+                        p.positive_suffix,
+                        p.negative_prefix,
+                        p.negative_suffix,
+                    ],
                     p.primary_grouping,
                     p.secondary_grouping,
                     p.min_grouping,
@@ -138,13 +143,15 @@ macro_rules! common_impl {
             /// `value`（小数桁数をスケールとする整数）を `out` の末尾に追記する
             #[inline]
             pub fn write_i32(&self, out: &mut String, value: i32) {
-                self.0.write_u32::<{ $fast_frac }>(out, value < 0, value.unsigned_abs())
+                self.0
+                    .write_u32::<{ $fast_frac }>(out, value < 0, value.unsigned_abs())
             }
 
             /// `value`（小数桁数をスケールとする整数）を `out` の末尾に追記する
             #[inline]
             pub fn write_i64(&self, out: &mut String, value: i64) {
-                self.0.write_u64::<{ $fast_frac }>(out, value < 0, value.unsigned_abs())
+                self.0
+                    .write_u64::<{ $fast_frac }>(out, value < 0, value.unsigned_abs())
             }
 
             /// 新しい String に書き出す（便利用。速さが必要なら write_* でバッファを使い回す）
@@ -164,7 +171,11 @@ macro_rules! common_impl {
     };
 }
 /// 速い経路で扱う小数桁数の集合（ビット k が立っていれば k 桁）。features で決まる
-const NUMBER_FAST_FRAC: u16 = if cfg!(feature = "number-frac") { 0b1_1111_1111 } else { 0 }; // 0〜8
+const NUMBER_FAST_FRAC: u16 = if cfg!(feature = "number-frac") {
+    0b1_1111_1111
+} else {
+    0
+}; // 0〜8
 const CURRENCY_FAST_FRAC: u16 = (cfg!(feature = "currency-frac-0") as u16)
     | (cfg!(feature = "currency-frac-2") as u16) << 2
     | (cfg!(feature = "currency-frac-3") as u16) << 3;

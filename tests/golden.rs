@@ -28,11 +28,16 @@ fn n8(v: &Value, k: &str) -> u8 {
 fn currency(p: &Value, l: &str, code: &str) -> CurrencyFormat<'static> {
     let c = &p[l]["currencies"][code];
     CurrencyFormat::new(CurrencyParams {
-        decimal: st(c, "decimal"), group: st(c, "group"),
-        primary_grouping: n8(c, "primary_grouping"), secondary_grouping: n8(c, "secondary_grouping"),
-        min_grouping: n8(c, "min_grouping"), frac_digits: n8(c, "frac_digits"),
-        positive_prefix: st(c, "positive_prefix"), positive_suffix: st(c, "positive_suffix"),
-        negative_prefix: st(c, "negative_prefix"), negative_suffix: st(c, "negative_suffix"),
+        decimal: st(c, "decimal"),
+        group: st(c, "group"),
+        primary_grouping: n8(c, "primary_grouping"),
+        secondary_grouping: n8(c, "secondary_grouping"),
+        min_grouping: n8(c, "min_grouping"),
+        frac_digits: n8(c, "frac_digits"),
+        positive_prefix: st(c, "positive_prefix"),
+        positive_suffix: st(c, "positive_suffix"),
+        negative_prefix: st(c, "negative_prefix"),
+        negative_suffix: st(c, "negative_suffix"),
     })
     .unwrap()
 }
@@ -40,11 +45,16 @@ fn currency(p: &Value, l: &str, code: &str) -> CurrencyFormat<'static> {
 fn number(p: &Value, l: &str, d: u8) -> NumberFormat<'static> {
     let c = &p[l]["number"];
     NumberFormat::new(NumberParams {
-        decimal: st(c, "decimal"), group: st(c, "group"),
-        primary_grouping: n8(c, "primary_grouping"), secondary_grouping: n8(c, "secondary_grouping"),
-        min_grouping: n8(c, "min_grouping"), frac_digits: d,
-        positive_prefix: st(c, "positive_prefix"), positive_suffix: st(c, "positive_suffix"),
-        negative_prefix: st(c, "negative_prefix"), negative_suffix: st(c, "negative_suffix"),
+        decimal: st(c, "decimal"),
+        group: st(c, "group"),
+        primary_grouping: n8(c, "primary_grouping"),
+        secondary_grouping: n8(c, "secondary_grouping"),
+        min_grouping: n8(c, "min_grouping"),
+        frac_digits: d,
+        positive_prefix: st(c, "positive_prefix"),
+        positive_suffix: st(c, "positive_suffix"),
+        negative_prefix: st(c, "negative_prefix"),
+        negative_suffix: st(c, "negative_suffix"),
     })
     .unwrap()
 }
@@ -55,7 +65,12 @@ fn currency_matches_intl() {
     let mut n = 0;
     let mut cache: Option<(String, String, CurrencyFormat)> = None;
     for row in g["currency"].as_array().unwrap() {
-        let (l, code, m, want) = (row[0].as_str().unwrap(), row[1].as_str().unwrap(), row[2].as_str().unwrap(), row[3].as_str().unwrap());
+        let (l, code, m, want) = (
+            row[0].as_str().unwrap(),
+            row[1].as_str().unwrap(),
+            row[2].as_str().unwrap(),
+            row[3].as_str().unwrap(),
+        );
         if cache.as_ref().is_none_or(|c| c.0 != l || c.1 != code) {
             cache = Some((l.into(), code.into(), currency(&p, l, code)));
         }
@@ -77,7 +92,12 @@ fn number_matches_intl() {
     let Some((p, g)) = data() else { return };
     let mut n = 0;
     for row in g["number"].as_array().unwrap() {
-        let (l, d, m, want) = (row[0].as_str().unwrap(), row[1].as_u64().unwrap() as u8, row[2].as_str().unwrap(), row[3].as_str().unwrap());
+        let (l, d, m, want) = (
+            row[0].as_str().unwrap(),
+            row[1].as_u64().unwrap() as u8,
+            row[2].as_str().unwrap(),
+            row[3].as_str().unwrap(),
+        );
         let f = number(&p, l, d);
         let v: i64 = m.parse().unwrap();
         assert_eq!(f.format_i64(v), want, "{l} d={d} {v}");

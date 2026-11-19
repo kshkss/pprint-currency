@@ -113,7 +113,12 @@ impl<'a> Layout<'a> {
         // 速い経路の条件: 小数桁数が集合に含まれ、区切り方の特殊化があり、
         // （区切るなら）minimumGroupingDigits が集合に含まれること
         let frac_ok = frac <= 8 && fast_frac_mask & (1 << frac) != 0;
-        let mg_ok = match min_grouping { 1 => MIN_GROUP1, 2 => MIN_GROUP2, 3 => MIN_GROUP3, _ => false };
+        let mg_ok = match min_grouping {
+            1 => MIN_GROUP1,
+            2 => MIN_GROUP2,
+            3 => MIN_GROUP3,
+            _ => false,
+        };
         let kernel = match (frac_ok, primary, secondary) {
             (true, 3, 3) if GROUP3 && mg_ok => Kernel::G33,
             (true, 3, 2) if INDIAN && mg_ok => Kernel::G32,
@@ -123,7 +128,17 @@ impl<'a> Layout<'a> {
         let aff = (affix[0].len() + affix[1].len()).max(affix[2].len() + affix[3].len());
         // 数字は最大 20 桁（u64）＋0 の補い 1 桁。区切りは数字の数より少ない
         let max_len = aff + 21 + 20 * group.len() + decimal.len();
-        Ok(Layout { decimal, group, affix, primary, secondary, min_grouping, frac, kernel, max_len })
+        Ok(Layout {
+            decimal,
+            group,
+            affix,
+            primary,
+            secondary,
+            min_grouping,
+            frac,
+            kernel,
+            max_len,
+        })
     }
 
     pub(crate) fn frac_digits(&self) -> u8 {
@@ -136,7 +151,11 @@ impl<'a> Layout<'a> {
             return self.write_generic(out, neg, m);
         }
         let k = neg as usize * 2;
-        let (g, dec, mg) = (self.group.as_bytes(), self.decimal.as_bytes(), self.min_grouping as u32);
+        let (g, dec, mg) = (
+            self.group.as_bytes(),
+            self.decimal.as_bytes(),
+            self.min_grouping as u32,
+        );
         // SAFETY: 書き込むのは ASCII 数字と、&str（区切り・小数点・前後の文字列）を丸ごとなので
         // UTF-8 は保たれる。書き込み量は構築時に計算した max_len 以内で、その分を先に reserve している
         unsafe {
@@ -147,11 +166,26 @@ impl<'a> Layout<'a> {
             w.s(self.affix[k].as_bytes());
             match self.kernel {
                 // 定数が false の腕は選ばれないので、最適化でコードごと消える
-                Kernel::G33 if GROUP3 => dispatch_d!(FAST_FRAC_MASK, self.frac, |D| grouped64::<3, 3, D>(&mut w, m, mg, g, dec)),
-                Kernel::G32 if INDIAN => dispatch_d!(FAST_FRAC_MASK, self.frac, |D| grouped64::<3, 2, D>(&mut w, m, mg, g, dec)),
-                Kernel::G22 if GROUP2 => dispatch_d!(FAST_FRAC_MASK, self.frac, |D| grouped64::<2, 2, D>(&mut w, m, mg, g, dec)),
+                Kernel::G33 if GROUP3 => {
+                    dispatch_d!(FAST_FRAC_MASK, self.frac, |D| grouped64::<3, 3, D>(
+                        &mut w, m, mg, g, dec
+                    ))
+                }
+                Kernel::G32 if INDIAN => {
+                    dispatch_d!(FAST_FRAC_MASK, self.frac, |D| grouped64::<3, 2, D>(
+                        &mut w, m, mg, g, dec
+                    ))
+                }
+                Kernel::G22 if GROUP2 => {
+                    dispatch_d!(FAST_FRAC_MASK, self.frac, |D| grouped64::<2, 2, D>(
+                        &mut w, m, mg, g, dec
+                    ))
+                }
                 // SAFETY: 構築時に、有効な特殊化のときだけ速い経路を選んでいる（Generic は先に返している）
-                _ => { debug_assert!(false, "無効な特殊化"); core::hint::unreachable_unchecked() }
+                _ => {
+                    debug_assert!(false, "無効な特殊化");
+                    core::hint::unreachable_unchecked()
+                }
             }
             w.s(self.affix[k + 1].as_bytes());
             let n = w.p.offset_from(start) as usize;
@@ -166,7 +200,11 @@ impl<'a> Layout<'a> {
             return self.write_generic(out, neg, m as u64);
         }
         let k = neg as usize * 2;
-        let (g, dec, mg) = (self.group.as_bytes(), self.decimal.as_bytes(), self.min_grouping as u32);
+        let (g, dec, mg) = (
+            self.group.as_bytes(),
+            self.decimal.as_bytes(),
+            self.min_grouping as u32,
+        );
         // SAFETY: write_u64 と同じ（u32 は最大 10 桁なので max_len に収まる）
         unsafe {
             let v = out.as_mut_vec();
@@ -176,11 +214,26 @@ impl<'a> Layout<'a> {
             w.s(self.affix[k].as_bytes());
             match self.kernel {
                 // 定数が false の腕は選ばれないので、最適化でコードごと消える
-                Kernel::G33 if GROUP3 => dispatch_d!(FAST_FRAC_MASK, self.frac, |D| grouped32::<3, 3, D>(&mut w, m, mg, g, dec)),
-                Kernel::G32 if INDIAN => dispatch_d!(FAST_FRAC_MASK, self.frac, |D| grouped32::<3, 2, D>(&mut w, m, mg, g, dec)),
-                Kernel::G22 if GROUP2 => dispatch_d!(FAST_FRAC_MASK, self.frac, |D| grouped32::<2, 2, D>(&mut w, m, mg, g, dec)),
+                Kernel::G33 if GROUP3 => {
+                    dispatch_d!(FAST_FRAC_MASK, self.frac, |D| grouped32::<3, 3, D>(
+                        &mut w, m, mg, g, dec
+                    ))
+                }
+                Kernel::G32 if INDIAN => {
+                    dispatch_d!(FAST_FRAC_MASK, self.frac, |D| grouped32::<3, 2, D>(
+                        &mut w, m, mg, g, dec
+                    ))
+                }
+                Kernel::G22 if GROUP2 => {
+                    dispatch_d!(FAST_FRAC_MASK, self.frac, |D| grouped32::<2, 2, D>(
+                        &mut w, m, mg, g, dec
+                    ))
+                }
                 // SAFETY: 構築時に、有効な特殊化のときだけ速い経路を選んでいる（Generic は先に返している）
-                _ => { debug_assert!(false, "無効な特殊化"); core::hint::unreachable_unchecked() }
+                _ => {
+                    debug_assert!(false, "無効な特殊化");
+                    core::hint::unreachable_unchecked()
+                }
             }
             w.s(self.affix[k + 1].as_bytes());
             let n = w.p.offset_from(start) as usize;
@@ -202,7 +255,10 @@ impl<'a> Layout<'a> {
         // 先頭グループの桁数（区切らないときは整数部全体）
         let first = if grouping {
             let h = int_len - p;
-            match h % sc { 0 => sc, r => r }
+            match h % sc {
+                0 => sc,
+                r => r,
+            }
         } else {
             int_len
         };
@@ -235,7 +291,6 @@ impl<'a> Layout<'a> {
         }
     }
 }
-
 
 /// 生ポインタへの書き込み（容量確認なし。呼び出し側で reserve 済み）
 struct Raw {
@@ -304,18 +359,61 @@ impl Raw {
 fn count_digits(v: u64) -> u32 {
     if v < 100_000_000 {
         if v < 10_000 {
-            if v < 100 { if v < 10 { 1 } else { 2 } } else if v < 1_000 { 3 } else { 4 }
+            if v < 100 {
+                if v < 10 {
+                    1
+                } else {
+                    2
+                }
+            } else if v < 1_000 {
+                3
+            } else {
+                4
+            }
         } else if v < 1_000_000 {
-            if v < 100_000 { 5 } else { 6 }
-        } else if v < 10_000_000 { 7 } else { 8 }
+            if v < 100_000 {
+                5
+            } else {
+                6
+            }
+        } else if v < 10_000_000 {
+            7
+        } else {
+            8
+        }
     } else if v < 10_000_000_000_000_000 {
         if v < 1_000_000_000_000 {
-            if v < 10_000_000_000 { if v < 1_000_000_000 { 9 } else { 10 } } else if v < 100_000_000_000 { 11 } else { 12 }
+            if v < 10_000_000_000 {
+                if v < 1_000_000_000 {
+                    9
+                } else {
+                    10
+                }
+            } else if v < 100_000_000_000 {
+                11
+            } else {
+                12
+            }
         } else if v < 100_000_000_000_000 {
-            if v < 10_000_000_000_000 { 13 } else { 14 }
-        } else if v < 1_000_000_000_000_000 { 15 } else { 16 }
-    } else if v < 100_000_000_000_000_000 { 17 } else if v < 1_000_000_000_000_000_000 { 18 }
-    else if v < 10_000_000_000_000_000_000 { 19 } else { 20 }
+            if v < 10_000_000_000_000 {
+                13
+            } else {
+                14
+            }
+        } else if v < 1_000_000_000_000_000 {
+            15
+        } else {
+            16
+        }
+    } else if v < 100_000_000_000_000_000 {
+        17
+    } else if v < 1_000_000_000_000_000_000 {
+        18
+    } else if v < 10_000_000_000_000_000_000 {
+        19
+    } else {
+        20
+    }
 }
 
 /// 遅い経路の書き込み状態。数字を 1 文字書くたびに、区切り・小数点を入れるかを判定する
@@ -345,7 +443,11 @@ impl Fwd<'_> {
                 }
             } else if self.grp_left == 0 {
                 self.w.s(self.group);
-                self.grp_left = if self.int_left == self.primary { self.primary } else { self.secondary };
+                self.grp_left = if self.int_left == self.primary {
+                    self.primary
+                } else {
+                    self.secondary
+                };
             }
         }
     }
@@ -359,9 +461,15 @@ impl Fwd<'_> {
     #[inline(always)]
     unsafe fn lead4(&mut self, v: u32) {
         let (d1, d2) = ((v / 100) as usize * 2, (v % 100) as usize * 2);
-        if v >= 1000 { self.digit(LUT[d1]); }
-        if v >= 100 { self.digit(LUT[d1 + 1]); }
-        if v >= 10 { self.digit(LUT[d2]); }
+        if v >= 1000 {
+            self.digit(LUT[d1]);
+        }
+        if v >= 100 {
+            self.digit(LUT[d1 + 1]);
+        }
+        if v >= 10 {
+            self.digit(LUT[d2]);
+        }
         self.digit(LUT[d2 + 1]);
     }
     #[inline(always)]
@@ -406,7 +514,11 @@ macro_rules! bodies {
         /// 区切りあり。P = 第1グループ幅, S = 第2グループ幅, D = 小数桁数
         #[inline(always)]
         unsafe fn $grouped<const P: usize, const S: usize, const D: usize>(
-            w: &mut Raw, m: $t, mg: u32, g: &[u8], dec: &[u8],
+            w: &mut Raw,
+            m: $t,
+            mg: u32,
+            g: &[u8],
+            dec: &[u8],
         ) {
             let pd = POW10[D] as $t;
             let int = m / pd;
@@ -440,8 +552,6 @@ macro_rules! bodies {
                 w.fixed::<D>(frac);
             }
         }
-
-
     };
 }
 bodies!(grouped64, u64);
@@ -452,7 +562,9 @@ mod tests {
     use super::*;
 
     fn kernel(p: u8, s: u8, mg: u8, d: u8, mask: u16) -> Kernel {
-        Layout::new(".", ",", ["", "", "-", ""], p, s, mg, d, mask).unwrap().kernel
+        Layout::new(".", ",", ["", "", "-", ""], p, s, mg, d, mask)
+            .unwrap()
+            .kernel
     }
 
     /// 有効な features から期待される書き出し方
@@ -460,7 +572,12 @@ mod tests {
     fn expected(p: u8, s: u8, mg: u8, d: u8, mask: u16) -> Kernel {
         let s = if s == 0 { p } else { s };
         let frac_ok = d <= 8 && mask & (1 << d) != 0;
-        let mg_ok = match mg { 1 => cfg!(feature = "min-group-1"), 2 => cfg!(feature = "min-group-2"), 3 => cfg!(feature = "min-group-3"), _ => false };
+        let mg_ok = match mg {
+            1 => cfg!(feature = "min-group-1"),
+            2 => cfg!(feature = "min-group-2"),
+            3 => cfg!(feature = "min-group-3"),
+            _ => false,
+        };
         match (p, s) {
             _ if !frac_ok => Kernel::Generic,
             (3, 3) if cfg!(feature = "group-3") && mg_ok => Kernel::G33,
@@ -473,11 +590,27 @@ mod tests {
     #[test]
     fn fast_path_selection() {
         let masks = [0u16, 0b101, 0b1101, 0x1ff, 0b1_0000_0010];
-        for (p, s) in [(3, 3), (3, 2), (3, 0), (2, 2), (2, 0), (0, 0), (0, 3), (2, 3), (4, 4), (1, 1), (3, 4)] {
+        for (p, s) in [
+            (3, 3),
+            (3, 2),
+            (3, 0),
+            (2, 2),
+            (2, 0),
+            (0, 0),
+            (0, 3),
+            (2, 3),
+            (4, 4),
+            (1, 1),
+            (3, 4),
+        ] {
             for mg in 1..=4 {
                 for d in 0..=19 {
                     for mask in masks {
-                        assert_eq!(kernel(p, s, mg, d, mask), expected(p, s, mg, d, mask), "{p},{s} mg={mg} d={d} mask={mask:b}");
+                        assert_eq!(
+                            kernel(p, s, mg, d, mask),
+                            expected(p, s, mg, d, mask),
+                            "{p},{s} mg={mg} d={d} mask={mask:b}"
+                        );
                     }
                 }
             }
