@@ -31,6 +31,8 @@
 #[macro_use]
 mod kernel;
 
+use std::borrow::Cow;
+
 use crate::kernel::{
     count_digits, grouped32, grouped64, Fwd, Kernel, Raw, GROUP2, GROUP3, INDIAN, MIN_GROUP1,
     MIN_GROUP2, MIN_GROUP3,
@@ -124,10 +126,10 @@ const _: () = assert!(NUMBER_FAST_FRAC < 1 << 9 && CURRENCY_FAST_FRAC < 1 << 9);
 /// 数値の書式（検証・前計算済み）
 #[derive(Debug, Clone)]
 pub struct NumberFormat<'a> {
-    decimal: &'a str,
-    group: &'a str,
+    decimal: Cow<'a, str>,
+    group: Cow<'a, str>,
     /// 負符号（負の値の前にだけ付ける）
-    minus_sign: &'a str,
+    minus_sign: Cow<'a, str>,
     primary: u8,
     secondary: u8,
     min_grouping: u8,
@@ -175,9 +177,9 @@ impl<'a> NumberFormat<'a> {
         // 数字は最大 20 桁（u64）＋0 の補い 1 桁。区切りは数字の数より少ない
         let max_len = p.negative_prefix.len() + 21 + 20 * p.group.len() + p.decimal.len();
         Ok(NumberFormat {
-            decimal: p.decimal,
-            group: p.group,
-            minus_sign: p.negative_prefix,
+            decimal: Cow::Borrowed(p.decimal),
+            group: Cow::Borrowed(p.group),
+            minus_sign: Cow::Borrowed(p.negative_prefix),
             primary,
             secondary,
             min_grouping: p.min_grouping,
@@ -368,12 +370,12 @@ impl<'a> NumberFormat<'a> {
 /// 通貨の書式（検証・前計算済み）
 #[derive(Debug, Clone)]
 pub struct CurrencyFormat<'a> {
-    decimal: &'a str,
-    group: &'a str,
+    decimal: Cow<'a, str>,
+    group: Cow<'a, str>,
     /// 非負の値の [前, 後]
-    nonneg_affix: [&'a str; 2],
+    nonneg_affix: [Cow<'a, str>; 2],
     /// 負の値の [前, 後]
-    neg_affix: [&'a str; 2],
+    neg_affix: [Cow<'a, str>; 2],
     primary: u8,
     secondary: u8,
     min_grouping: u8,
@@ -418,17 +420,21 @@ impl<'a> CurrencyFormat<'a> {
             (true, 2, 2) if GROUP2 && mg_ok => Kernel::G22,
             _ => Kernel::Generic,
         };
-        let nonneg_affix = [p.positive_prefix, p.positive_suffix];
-        let neg_affix = [p.negative_prefix, p.negative_suffix];
-        let aff = (nonneg_affix[0].len() + nonneg_affix[1].len())
-            .max(neg_affix[0].len() + neg_affix[1].len());
+        let aff = (p.positive_prefix.len() + p.positive_suffix.len())
+            .max(p.negative_prefix.len() + p.negative_suffix.len());
         // 数字は最大 20 桁（u64）＋0 の補い 1 桁。区切りは数字の数より少ない
         let max_len = aff + 21 + 20 * p.group.len() + p.decimal.len();
         Ok(CurrencyFormat {
-            decimal: p.decimal,
-            group: p.group,
-            nonneg_affix,
-            neg_affix,
+            decimal: Cow::Borrowed(p.decimal),
+            group: Cow::Borrowed(p.group),
+            nonneg_affix: [
+                Cow::Borrowed(p.positive_prefix),
+                Cow::Borrowed(p.positive_suffix),
+            ],
+            neg_affix: [
+                Cow::Borrowed(p.negative_prefix),
+                Cow::Borrowed(p.negative_suffix),
+            ],
             primary,
             secondary,
             min_grouping: p.min_grouping,
