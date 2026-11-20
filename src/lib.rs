@@ -370,8 +370,10 @@ impl<'a> NumberFormat<'a> {
 pub struct CurrencyFormat<'a> {
     decimal: &'a str,
     group: &'a str,
-    /// [正の前, 正の後, 負の前, 負の後]
-    affix: [&'a str; 4],
+    /// 非負の値の [前, 後]
+    nonneg_affix: [&'a str; 2],
+    /// 負の値の [前, 後]
+    neg_affix: [&'a str; 2],
     primary: u8,
     secondary: u8,
     min_grouping: u8,
@@ -416,19 +418,17 @@ impl<'a> CurrencyFormat<'a> {
             (true, 2, 2) if GROUP2 && mg_ok => Kernel::G22,
             _ => Kernel::Generic,
         };
-        let affix = [
-            p.positive_prefix,
-            p.positive_suffix,
-            p.negative_prefix,
-            p.negative_suffix,
-        ];
-        let aff = (affix[0].len() + affix[1].len()).max(affix[2].len() + affix[3].len());
+        let nonneg_affix = [p.positive_prefix, p.positive_suffix];
+        let neg_affix = [p.negative_prefix, p.negative_suffix];
+        let aff = (nonneg_affix[0].len() + nonneg_affix[1].len())
+            .max(neg_affix[0].len() + neg_affix[1].len());
         // 数字は最大 20 桁（u64）＋0 の補い 1 桁。区切りは数字の数より少ない
         let max_len = aff + 21 + 20 * p.group.len() + p.decimal.len();
         Ok(CurrencyFormat {
             decimal: p.decimal,
             group: p.group,
-            affix,
+            nonneg_affix,
+            neg_affix,
             primary,
             secondary,
             min_grouping: p.min_grouping,
@@ -474,7 +474,11 @@ impl<'a> CurrencyFormat<'a> {
         if self.kernel == Kernel::Generic {
             return self.write_generic(out, neg, m);
         }
-        let k = neg as usize * 2;
+        let affix = if neg {
+            &self.neg_affix
+        } else {
+            &self.nonneg_affix
+        };
         let (g, dec, mg) = (
             self.group.as_bytes(),
             self.decimal.as_bytes(),
@@ -487,7 +491,7 @@ impl<'a> CurrencyFormat<'a> {
             v.reserve(self.max_len);
             let start = v.as_mut_ptr().add(v.len());
             let mut w = Raw { p: start };
-            w.s(self.affix[k].as_bytes());
+            w.s(affix[0].as_bytes());
             match self.kernel {
                 // 定数が false の腕は選ばれないので、最適化でコードごと消える
                 Kernel::G33 if GROUP3 => {
@@ -511,7 +515,7 @@ impl<'a> CurrencyFormat<'a> {
                     core::hint::unreachable_unchecked()
                 }
             }
-            w.s(self.affix[k + 1].as_bytes());
+            w.s(affix[1].as_bytes());
             let n = w.p.offset_from(start) as usize;
             debug_assert!(n <= self.max_len);
             v.set_len(v.len() + n);
@@ -523,7 +527,11 @@ impl<'a> CurrencyFormat<'a> {
         if self.kernel == Kernel::Generic {
             return self.write_generic(out, neg, m as u64);
         }
-        let k = neg as usize * 2;
+        let affix = if neg {
+            &self.neg_affix
+        } else {
+            &self.nonneg_affix
+        };
         let (g, dec, mg) = (
             self.group.as_bytes(),
             self.decimal.as_bytes(),
@@ -535,7 +543,7 @@ impl<'a> CurrencyFormat<'a> {
             v.reserve(self.max_len);
             let start = v.as_mut_ptr().add(v.len());
             let mut w = Raw { p: start };
-            w.s(self.affix[k].as_bytes());
+            w.s(affix[0].as_bytes());
             match self.kernel {
                 // 定数が false の腕は選ばれないので、最適化でコードごと消える
                 Kernel::G33 if GROUP3 => {
@@ -559,7 +567,7 @@ impl<'a> CurrencyFormat<'a> {
                     core::hint::unreachable_unchecked()
                 }
             }
-            w.s(self.affix[k + 1].as_bytes());
+            w.s(affix[1].as_bytes());
             let n = w.p.offset_from(start) as usize;
             debug_assert!(n <= self.max_len);
             v.set_len(v.len() + n);
@@ -586,7 +594,11 @@ impl<'a> CurrencyFormat<'a> {
         } else {
             int_len
         };
-        let k = neg as usize * 2;
+        let affix = if neg {
+            &self.neg_affix
+        } else {
+            &self.nonneg_affix
+        };
         // SAFETY: 速い経路と同じ。書き込むのは ASCII 数字と &str を丸ごとで、量は max_len 以内
         // （数字は最大 20 桁、区切りはそれより少ない）。その分を先に reserve している
         unsafe {
@@ -603,12 +615,12 @@ impl<'a> CurrencyFormat<'a> {
                 group: self.group.as_bytes(),
                 decimal: self.decimal.as_bytes(),
             };
-            w.w.s(self.affix[k].as_bytes());
+            w.w.s(affix[0].as_bytes());
             for _ in n..total {
                 w.digit(b'0');
             }
             w.u64(m);
-            w.w.s(self.affix[k + 1].as_bytes());
+            w.w.s(affix[1].as_bytes());
             let written = w.w.p.offset_from(start) as usize;
             debug_assert!(written <= self.max_len);
             v.set_len(v.len() + written);
