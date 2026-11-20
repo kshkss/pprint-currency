@@ -100,6 +100,8 @@ for loc in locales:
     dp = compile_pattern(n['decimalFormats-numberSystem-' + ns]['standard'])
     if any(x[0] == 'Cur' for k in ('pre', 'suf', 'npre', 'nsuf') for x in dp[k]): raise ValueError('数値パターンに ¤')
     naff = [resolve(dp[k], '', minus) for k in ('pre', 'suf', 'npre', 'nsuf')]
+    # NumberFormat は負の前（負符号）だけを使い、他の前後の文字列は無視する。無視される値が出たら止める
+    if naff[0] or naff[1] or naff[3]: raise ValueError('数値パターンの前後の文字列は負符号以外未対応: %s %r' % (loc, naff))
     number = dict(decimal=sym['decimal'], group=sym['group'], primary_grouping=dp['grouping'][0],
                   secondary_grouping=dp['grouping'][1], min_grouping=mg,
                   positive_prefix=naff[0], positive_suffix=naff[1], negative_prefix=naff[2], negative_suffix=naff[3])

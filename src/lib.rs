@@ -73,13 +73,13 @@ pub struct NumberParams<'a> {
     pub min_grouping: u8,
     /// 小数桁数（値のスケール）
     pub frac_digits: u8,
-    /// 正の値の前に付ける文字列（通常 ""）
+    /// 正の値の前に付ける文字列。NumberFormat は使わない（無視する）
     pub positive_prefix: &'a str,
-    /// 正の値の後に付ける文字列（通常 ""）
+    /// 正の値の後に付ける文字列。NumberFormat は使わない（無視する）
     pub positive_suffix: &'a str,
-    /// 負の値の前に付ける文字列（通常 "-"）
+    /// 負の値の前に付ける文字列＝負符号（通常 "-"）
     pub negative_prefix: &'a str,
-    /// 負の値の後に付ける文字列（通常 ""）
+    /// 負の値の後に付ける文字列。NumberFormat は使わない（無視する）
     pub negative_suffix: &'a str,
 }
 
@@ -126,8 +126,8 @@ const _: () = assert!(NUMBER_FAST_FRAC < 1 << 9 && CURRENCY_FAST_FRAC < 1 << 9);
 pub struct NumberFormat<'a> {
     decimal: &'a str,
     group: &'a str,
-    /// [正の前, 正の後, 負の前, 負の後]
-    affix: [&'a str; 4],
+    /// 負符号（負の値の前にだけ付ける）
+    minus_sign: &'a str,
     primary: u8,
     secondary: u8,
     min_grouping: u8,
@@ -172,19 +172,12 @@ impl<'a> NumberFormat<'a> {
             (true, 2, 2) if GROUP2 && mg_ok => Kernel::G22,
             _ => Kernel::Generic,
         };
-        let affix = [
-            p.positive_prefix,
-            p.positive_suffix,
-            p.negative_prefix,
-            p.negative_suffix,
-        ];
-        let aff = (affix[0].len() + affix[1].len()).max(affix[2].len() + affix[3].len());
         // 数字は最大 20 桁（u64）＋0 の補い 1 桁。区切りは数字の数より少ない
-        let max_len = aff + 21 + 20 * p.group.len() + p.decimal.len();
+        let max_len = p.negative_prefix.len() + 21 + 20 * p.group.len() + p.decimal.len();
         Ok(NumberFormat {
             decimal: p.decimal,
             group: p.group,
-            affix,
+            minus_sign: p.negative_prefix,
             primary,
             secondary,
             min_grouping: p.min_grouping,
@@ -230,20 +223,21 @@ impl<'a> NumberFormat<'a> {
         if self.kernel == Kernel::Generic {
             return self.write_generic(out, neg, m);
         }
-        let k = neg as usize * 2;
         let (g, dec, mg) = (
             self.group.as_bytes(),
             self.decimal.as_bytes(),
             self.min_grouping as u32,
         );
-        // SAFETY: 書き込むのは ASCII 数字と、&str（区切り・小数点・前後の文字列）を丸ごとなので
+        // SAFETY: 書き込むのは ASCII 数字と、&str（区切り・小数点・負符号）を丸ごとなので
         // UTF-8 は保たれる。書き込み量は構築時に計算した max_len 以内で、その分を先に reserve している
         unsafe {
             let v = out.as_mut_vec();
             v.reserve(self.max_len);
             let start = v.as_mut_ptr().add(v.len());
             let mut w = Raw { p: start };
-            w.s(self.affix[k].as_bytes());
+            if neg {
+                w.s(self.minus_sign.as_bytes());
+            }
             match self.kernel {
                 // 定数が false の腕は選ばれないので、最適化でコードごと消える
                 Kernel::G33 if GROUP3 => {
@@ -267,7 +261,6 @@ impl<'a> NumberFormat<'a> {
                     core::hint::unreachable_unchecked()
                 }
             }
-            w.s(self.affix[k + 1].as_bytes());
             let n = w.p.offset_from(start) as usize;
             debug_assert!(n <= self.max_len);
             v.set_len(v.len() + n);
@@ -279,7 +272,6 @@ impl<'a> NumberFormat<'a> {
         if self.kernel == Kernel::Generic {
             return self.write_generic(out, neg, m as u64);
         }
-        let k = neg as usize * 2;
         let (g, dec, mg) = (
             self.group.as_bytes(),
             self.decimal.as_bytes(),
@@ -291,7 +283,9 @@ impl<'a> NumberFormat<'a> {
             v.reserve(self.max_len);
             let start = v.as_mut_ptr().add(v.len());
             let mut w = Raw { p: start };
-            w.s(self.affix[k].as_bytes());
+            if neg {
+                w.s(self.minus_sign.as_bytes());
+            }
             match self.kernel {
                 // 定数が false の腕は選ばれないので、最適化でコードごと消える
                 Kernel::G33 if GROUP3 => {
@@ -315,7 +309,6 @@ impl<'a> NumberFormat<'a> {
                     core::hint::unreachable_unchecked()
                 }
             }
-            w.s(self.affix[k + 1].as_bytes());
             let n = w.p.offset_from(start) as usize;
             debug_assert!(n <= self.max_len);
             v.set_len(v.len() + n);
@@ -342,7 +335,6 @@ impl<'a> NumberFormat<'a> {
         } else {
             int_len
         };
-        let k = neg as usize * 2;
         // SAFETY: 速い経路と同じ。書き込むのは ASCII 数字と &str を丸ごとで、量は max_len 以内
         // （数字は最大 20 桁、区切りはそれより少ない）。その分を先に reserve している
         unsafe {
@@ -359,12 +351,13 @@ impl<'a> NumberFormat<'a> {
                 group: self.group.as_bytes(),
                 decimal: self.decimal.as_bytes(),
             };
-            w.w.s(self.affix[k].as_bytes());
+            if neg {
+                w.w.s(self.minus_sign.as_bytes());
+            }
             for _ in n..total {
                 w.digit(b'0');
             }
             w.u64(m);
-            w.w.s(self.affix[k + 1].as_bytes());
             let written = w.w.p.offset_from(start) as usize;
             debug_assert!(written <= self.max_len);
             v.set_len(v.len() + written);

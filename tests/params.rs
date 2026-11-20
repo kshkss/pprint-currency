@@ -2,7 +2,7 @@
 use pprint_currency::{CurrencyFormat, CurrencyParams, FormatError, NumberFormat, NumberParams};
 
 /// 参照実装: 10 進文字列を作り、右から 1 文字ずつ数えて区切りを入れる
-fn reference(p: &NumberParams, v: i64) -> String {
+fn reference(p: &CurrencyParams, v: i64) -> String {
     let d = p.frac_digits as usize;
     let mut s = v.unsigned_abs().to_string();
     while s.len() < d + 1 {
@@ -78,7 +78,7 @@ fn custom_params_match_reference() {
         for mg in [1u8, 2, 3, 4] {
             for d in [0u8, 1, 2, 3, 4, 5, 8, 9, 10, 15, 19] {
                 for (group, decimal) in [(",", "."), ("\u{202f}", ","), ("", "")] {
-                    let p = NumberParams {
+                    let cp = CurrencyParams {
                         decimal,
                         group,
                         primary_grouping: pr,
@@ -90,35 +90,47 @@ fn custom_params_match_reference() {
                         negative_prefix: "−(",
                         negative_suffix: ") 円",
                     };
-                    let f = NumberFormat::new(p).unwrap();
-                    let c = CurrencyFormat::new(CurrencyParams {
-                        decimal: p.decimal,
-                        group: p.group,
+                    // 数値は負の前（負符号）だけを使い、他の前後の文字列は無視する
+                    let np = CurrencyParams {
+                        positive_prefix: "",
+                        positive_suffix: "",
+                        negative_suffix: "",
+                        ..cp
+                    };
+                    let f = NumberFormat::new(NumberParams {
+                        decimal,
+                        group,
                         primary_grouping: pr,
                         secondary_grouping: sc,
                         min_grouping: mg,
                         frac_digits: d,
-                        positive_prefix: p.positive_prefix,
-                        positive_suffix: p.positive_suffix,
-                        negative_prefix: p.negative_prefix,
-                        negative_suffix: p.negative_suffix,
+                        positive_prefix: cp.positive_prefix,
+                        positive_suffix: cp.positive_suffix,
+                        negative_prefix: cp.negative_prefix,
+                        negative_suffix: cp.negative_suffix,
                     })
                     .unwrap();
+                    let c = CurrencyFormat::new(cp).unwrap();
                     for &v in &vals {
-                        let want = reference(&p, v);
+                        let want_n = reference(&np, v);
+                        let want_c = reference(&cp, v);
                         let mut s = String::from("前");
                         f.write_i64(&mut s, v);
-                        assert_eq!(&s["前".len()..], want, "{pr},{sc} mg={mg} d={d} {v}");
+                        assert_eq!(&s["前".len()..], want_n, "{pr},{sc} mg={mg} d={d} {v}");
                         assert_eq!(
                             c.format_i64(v),
-                            want,
+                            want_c,
                             "currency {pr},{sc} mg={mg} d={d} {v}"
                         );
                         if let Ok(v32) = i32::try_from(v) {
-                            assert_eq!(f.format_i32(v32), want, "i32 {pr},{sc} mg={mg} d={d} {v}");
+                            assert_eq!(
+                                f.format_i32(v32),
+                                want_n,
+                                "i32 {pr},{sc} mg={mg} d={d} {v}"
+                            );
                             assert_eq!(
                                 c.format_i32(v32),
-                                want,
+                                want_c,
                                 "currency i32 {pr},{sc} mg={mg} d={d} {v}"
                             );
                         }
