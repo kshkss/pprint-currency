@@ -143,9 +143,15 @@ if not rust_mode:
     print(json.dumps(result, ensure_ascii=False, indent=1))
 else:
     def fields(d):
-        return ', '.join('%s: %s' % (k, rs(v) if isinstance(v, str) else v) for k, v in d.items())
+        out = []
+        for k, v in d.items():
+            if k == 'primary_grouping': out.append('grouping: Grouping::new(%d, %d)' % (v, d['secondary_grouping']))
+            elif k == 'secondary_grouping': pass
+            elif isinstance(v, str): out.append('%s: %s' % (k, rs(v)))
+            else: out.append('%s: %s' % (k, v))
+        return ', '.join(out)
     out = ['// 自動生成（tools/gen.py --rust）。データ: Unicode CLDR（cldr-json）',
-           'use pprint_currency::{CurrencyParams, NumberParams};', '']
+           'use pprint_currency::{CurrencyParams, Grouping, NumberParams};', '']
     for loc, r in result.items():
         ident = loc.replace('-', '_').upper()
         out.append('/// %s の数値（frac_digits は用途に合わせて上書きする）' % loc)

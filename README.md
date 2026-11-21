@@ -57,7 +57,7 @@ cldr-core/supplemental/{currencyData,numberingSystems}.json を置いたフォ�
 ```sh
 # 必要な通貨だけ Rust の定数として出力（自分のクレートに貼る）
 python3 tools/gen.py --rust <root> ja:JPY,USD,EUR en:USD > src/formats.rs
-#   pub const JA_JPY: CurrencyParams<'static> = CurrencyParams { ... };
+#   pub const JA_JPY: CurrencyParams<'static> = CurrencyParams { ..., grouping: Grouping::new(3, 3), ... };
 #   pub const JA_NUMBER: NumberParams<'static> = NumberParams { ..., frac_digits: 0 };  // 小数桁数は用途に合わせて上書き
 
 # 全通貨を JSON で出力（テストや実行時の読み込み用）

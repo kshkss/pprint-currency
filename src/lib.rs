@@ -80,6 +80,11 @@ pub struct Grouping {
 }
 
 impl Grouping {
+    /// （第1グループ＝右端, 第2グループ以降）の幅から作る。`const` の中でも使える
+    pub const fn new(primary: u8, secondary: u8) -> Self {
+        Grouping { primary, secondary }
+    }
+
     /// 第1グループ（右端）の幅
     pub fn primary(&self) -> u8 {
         self.primary

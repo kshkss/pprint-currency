@@ -207,3 +207,38 @@ fn rejects_invalid_params() {
         FormatError::GroupingZero
     );
 }
+
+/// tools/gen.py --rust が出力する形の定数（Grouping::new）が書けて、そのまま使えること
+#[test]
+fn const_params_like_gen_py_output() {
+    const EN_IN_NUMBER: NumberParams<'static> = NumberParams {
+        decimal: ".",
+        group: ",",
+        grouping: Grouping::new(3, 2),
+        min_grouping: 1,
+        positive_prefix: "",
+        positive_suffix: "",
+        negative_prefix: "-",
+        negative_suffix: "",
+        frac_digits: 0,
+    };
+    const DE_EUR: CurrencyParams<'static> = CurrencyParams {
+        decimal: ",",
+        group: ".",
+        grouping: Grouping::new(3, 3),
+        min_grouping: 1,
+        frac_digits: 2,
+        positive_prefix: "",
+        positive_suffix: "\u{a0}€",
+        negative_prefix: "-",
+        negative_suffix: "\u{a0}€",
+    };
+    let n = NumberFormat::new(NumberParams {
+        frac_digits: 2,
+        ..EN_IN_NUMBER
+    })
+    .unwrap();
+    assert_eq!(n.format_i64(-123456789), "-12,34,567.89");
+    let c = CurrencyFormat::new(DE_EUR).unwrap();
+    assert_eq!(c.format_i64(-123456), "-1.234,56\u{a0}€");
+}
