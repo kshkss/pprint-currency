@@ -1,5 +1,7 @@
 //! 自分で値を決めた書式（速い経路に当てはまらない組み合わせを含む）を、素朴な参照実装と比べる
-use pprint_currency::{CurrencyFormat, CurrencyParams, FormatError, NumberFormat, NumberParams};
+use pprint_currency::{
+    CurrencyFormat, CurrencyParams, FormatError, Grouping, NumberFormat, NumberParams,
+};
 
 /// 参照実装: 10 進文字列を作り、右から 1 文字ずつ数えて区切りを入れる
 fn reference(p: &CurrencyParams, v: i64) -> String {
@@ -10,15 +12,11 @@ fn reference(p: &CurrencyParams, v: i64) -> String {
     }
     let (int, frac) = s.split_at(s.len() - d);
     let (pr, sc) = (
-        p.primary_grouping as usize,
-        if p.secondary_grouping == 0 {
-            p.primary_grouping
-        } else {
-            p.secondary_grouping
-        } as usize,
+        p.grouping.primary() as usize,
+        p.grouping.secondary() as usize,
     );
     let mut body = String::new();
-    let grouping = pr > 0 && int.len() >= pr + p.min_grouping as usize;
+    let grouping = int.len() >= pr + p.min_grouping as usize;
     let digits: Vec<char> = int.chars().collect();
     for (i, c) in digits.iter().enumerate() {
         let from_right = digits.len() - i; // この桁を含めて右に残る桁数
@@ -62,27 +60,27 @@ fn custom_params_match_reference() {
         vals.push((x >> (x % 64)) as i64 * if x & 1 == 0 { 1 } else { -1 });
     }
     let mut n = 0;
-    for (pr, sc) in [
-        (0, 0),
-        (3, 3),
-        (3, 2),
-        (2, 2),
-        (2, 3),
-        (3, 0),
-        (2, 0),
-        (4, 4),
-        (1, 1),
-        (3, 4),
-        (4, 3),
-    ] {
+    let groupings: [Grouping; 10] = [
+        3.into(),
+        2.into(),
+        4.into(),
+        1.into(),
+        (3, 3).into(),
+        (3, 2).into(),
+        (2, 2).into(),
+        (2, 3).into(),
+        (3, 4).into(),
+        (4, 3).into(),
+    ];
+    for g in groupings {
+        let (pr, sc) = (g.primary(), g.secondary());
         for mg in [1u8, 2, 3, 4] {
             for d in [0u8, 1, 2, 3, 4, 5, 8, 9, 10, 15, 19] {
                 for (group, decimal) in [(",", "."), ("\u{202f}", ","), ("", "")] {
                     let cp = CurrencyParams {
                         decimal,
                         group,
-                        primary_grouping: pr,
-                        secondary_grouping: sc,
+                        grouping: g,
                         min_grouping: mg,
                         frac_digits: d,
                         positive_prefix: "+[",
@@ -100,8 +98,7 @@ fn custom_params_match_reference() {
                     let f = NumberFormat::new(NumberParams {
                         decimal,
                         group,
-                        primary_grouping: pr,
-                        secondary_grouping: sc,
+                        grouping: g,
                         min_grouping: mg,
                         frac_digits: d,
                         positive_prefix: cp.positive_prefix,
@@ -148,8 +145,7 @@ fn rejects_invalid_params() {
     let base = NumberParams {
         decimal: ".",
         group: ",",
-        primary_grouping: 3,
-        secondary_grouping: 3,
+        grouping: 3.into(),
         min_grouping: 1,
         frac_digits: 2,
         positive_prefix: "",
@@ -173,12 +169,41 @@ fn rejects_invalid_params() {
         .unwrap_err(),
         FormatError::MinGroupingZero
     );
+    for g in [20.into(), (3, 20).into(), (20, 3).into()] {
+        assert_eq!(
+            NumberFormat::new(NumberParams {
+                grouping: g,
+                ..base
+            })
+            .unwrap_err(),
+            FormatError::GroupingTooLarge,
+            "{g:?}"
+        );
+    }
+    for g in [0.into(), (0, 3).into(), (3, 0).into()] {
+        assert_eq!(
+            NumberFormat::new(NumberParams {
+                grouping: g,
+                ..base
+            })
+            .unwrap_err(),
+            FormatError::GroupingZero,
+            "{g:?}"
+        );
+    }
     assert_eq!(
-        NumberFormat::new(NumberParams {
-            primary_grouping: 20,
-            ..base
+        CurrencyFormat::new(CurrencyParams {
+            decimal: base.decimal,
+            group: base.group,
+            grouping: (3, 0).into(),
+            min_grouping: base.min_grouping,
+            frac_digits: base.frac_digits,
+            positive_prefix: base.positive_prefix,
+            positive_suffix: base.positive_suffix,
+            negative_prefix: base.negative_prefix,
+            negative_suffix: base.negative_suffix,
         })
         .unwrap_err(),
-        FormatError::GroupingTooLarge
+        FormatError::GroupingZero
     );
 }

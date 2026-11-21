@@ -14,7 +14,7 @@
 //! use pprint_currency::{CurrencyFormat, CurrencyParams, NumberFormat, NumberParams};
 //!
 //! let jpy = CurrencyFormat::new(CurrencyParams {
-//!     decimal: ".", group: ",", primary_grouping: 3, secondary_grouping: 3, min_grouping: 1, frac_digits: 0,
+//!     decimal: ".", group: ",", grouping: 3.into(), min_grouping: 1, frac_digits: 0,
 //!     positive_prefix: "￥", positive_suffix: "", negative_prefix: "-￥", negative_suffix: "",
 //! }).unwrap();
 //! let mut s = String::new();
@@ -22,7 +22,7 @@
 //! assert_eq!(s, "-￥1,234,567");
 //!
 //! let de = NumberFormat::new(NumberParams {
-//!     decimal: ",", group: ".", primary_grouping: 3, secondary_grouping: 3, min_grouping: 1, frac_digits: 2,
+//!     decimal: ",", group: ".", grouping: 3.into(), min_grouping: 1, frac_digits: 2,
 //!     positive_prefix: "", positive_suffix: "", negative_prefix: "-", negative_suffix: "",
 //! }).unwrap();
 //! assert_eq!(de.format_i32(123456), "1.234,56");
@@ -45,6 +45,8 @@ pub enum FormatError {
     FracDigitsTooLarge,
     /// minimumGroupingDigits が 0
     MinGroupingZero,
+    /// グループ幅が 0
+    GroupingZero,
     /// グループ幅が 19 を超えている
     GroupingTooLarge,
 }
@@ -54,11 +56,55 @@ impl std::fmt::Display for FormatError {
         f.write_str(match self {
             FormatError::FracDigitsTooLarge => "小数桁数は 19 以下にしてください",
             FormatError::MinGroupingZero => "min_grouping は 1 以上にしてください",
+            FormatError::GroupingZero => "グループ幅は 1 以上にしてください",
             FormatError::GroupingTooLarge => "グループ幅は 19 以下にしてください",
         })
     }
 }
 impl std::error::Error for FormatError {}
+
+/// グループ幅。`u8` なら全グループが同じ幅、`(u8, u8)` なら（第1グループ＝右端, 第2グループ以降）の幅
+///
+/// ```
+/// use pprint_currency::Grouping;
+///
+/// let g: Grouping = 3.into(); // 1,234,567
+/// assert_eq!((g.primary(), g.secondary()), (3, 3));
+/// let indian: Grouping = (3, 2).into(); // 12,34,567
+/// assert_eq!((indian.primary(), indian.secondary()), (3, 2));
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Grouping {
+    primary: u8,
+    secondary: u8,
+}
+
+impl Grouping {
+    /// 第1グループ（右端）の幅
+    pub fn primary(&self) -> u8 {
+        self.primary
+    }
+
+    /// 第2グループ以降の幅
+    pub fn secondary(&self) -> u8 {
+        self.secondary
+    }
+}
+
+impl From<u8> for Grouping {
+    fn from(n: u8) -> Self {
+        Grouping {
+            primary: n,
+            secondary: n,
+        }
+    }
+}
+
+impl From<(u8, u8)> for Grouping {
+    fn from((primary, secondary): (u8, u8)) -> Self {
+        Grouping { primary, secondary }
+    }
+}
 
 /// 数値の書式を作るための値
 #[derive(Debug, Clone, Copy)]
@@ -67,11 +113,9 @@ pub struct NumberParams<'a> {
     pub decimal: &'a str,
     /// 桁区切り（例: "," / "." / "\u{202f}"）
     pub group: &'a str,
-    /// 第1グループの幅（右端のグループ。0 なら区切らない）
-    pub primary_grouping: u8,
-    /// 第2グループ以降の幅（0 なら primary_grouping と同じ。インド式なら 2）
-    pub secondary_grouping: u8,
-    /// 整数部がこの桁数＋primary_grouping 以上のときだけ区切る（CLDR の minimumGroupingDigits。通常 1）
+    /// グループ幅（例: `3.into()`、インド式なら `(3, 2).into()`）。0 は不可
+    pub grouping: Grouping,
+    /// 整数部がこの桁数＋第1グループの幅以上のときだけ区切る（CLDR の minimumGroupingDigits。通常 1）
     pub min_grouping: u8,
     /// 小数桁数（値のスケール）
     pub frac_digits: u8,
@@ -92,10 +136,8 @@ pub struct CurrencyParams<'a> {
     pub decimal: &'a str,
     /// 桁区切り
     pub group: &'a str,
-    /// 第1グループの幅（0 なら区切らない）
-    pub primary_grouping: u8,
-    /// 第2グループ以降の幅（0 なら primary_grouping と同じ）
-    pub secondary_grouping: u8,
+    /// グループ幅（例: `3.into()`、インド式なら `(3, 2).into()`）。0 は不可
+    pub grouping: Grouping,
     /// CLDR の minimumGroupingDigits（通常 1）
     pub min_grouping: u8,
     /// 小数桁数（その通貨の値のスケール）
@@ -149,16 +191,13 @@ impl<'a> NumberFormat<'a> {
         if p.min_grouping == 0 {
             return Err(FormatError::MinGroupingZero);
         }
-        if p.primary_grouping > 19 || p.secondary_grouping > 19 {
+        let (primary, secondary) = (p.grouping.primary, p.grouping.secondary);
+        if primary == 0 || secondary == 0 {
+            return Err(FormatError::GroupingZero);
+        }
+        if primary > 19 || secondary > 19 {
             return Err(FormatError::GroupingTooLarge);
         }
-        let primary = p.primary_grouping;
-        // 第2グループ幅 0 は「第1グループと同じ」とみなす
-        let secondary = if p.secondary_grouping == 0 {
-            primary
-        } else {
-            p.secondary_grouping
-        };
         // 速い経路の条件: 小数桁数が集合に含まれ、区切り方の特殊化があり、
         // （区切るなら）minimumGroupingDigits が集合に含まれること
         let frac_ok = p.frac_digits <= 8 && NUMBER_FAST_FRAC & (1 << p.frac_digits) != 0;
@@ -395,16 +434,13 @@ impl<'a> CurrencyFormat<'a> {
         if p.min_grouping == 0 {
             return Err(FormatError::MinGroupingZero);
         }
-        if p.primary_grouping > 19 || p.secondary_grouping > 19 {
+        let (primary, secondary) = (p.grouping.primary, p.grouping.secondary);
+        if primary == 0 || secondary == 0 {
+            return Err(FormatError::GroupingZero);
+        }
+        if primary > 19 || secondary > 19 {
             return Err(FormatError::GroupingTooLarge);
         }
-        let primary = p.primary_grouping;
-        // 第2グループ幅 0 は「第1グループと同じ」とみなす
-        let secondary = if p.secondary_grouping == 0 {
-            primary
-        } else {
-            p.secondary_grouping
-        };
         // 速い経路の条件: 小数桁数が集合に含まれ、区切り方の特殊化があり、
         // （区切るなら）minimumGroupingDigits が集合に含まれること
         let frac_ok = p.frac_digits <= 8 && CURRENCY_FAST_FRAC & (1 << p.frac_digits) != 0;
@@ -642,7 +678,6 @@ mod tests {
     /// 有効な features から期待される書き出し方
     #[allow(clippy::match_like_matches_macro)]
     fn expected(p: u8, s: u8, mg: u8, d: u8, mask: u16) -> Kernel {
-        let s = if s == 0 { p } else { s };
         let frac_ok = d <= 8 && mask & (1 << d) != 0;
         let mg_ok = match mg {
             1 => cfg!(feature = "min-group-1"),
@@ -661,26 +696,13 @@ mod tests {
 
     #[test]
     fn fast_path_selection() {
-        for (p, s) in [
-            (3, 3),
-            (3, 2),
-            (3, 0),
-            (2, 2),
-            (2, 0),
-            (0, 0),
-            (0, 3),
-            (2, 3),
-            (4, 4),
-            (1, 1),
-            (3, 4),
-        ] {
+        for (p, s) in [(3, 3), (3, 2), (2, 2), (2, 3), (4, 4), (1, 1), (3, 4)] {
             for mg in 1..=4 {
                 for d in 0..=19 {
                     let cur = CurrencyFormat::new(CurrencyParams {
                         decimal: ".",
                         group: ",",
-                        primary_grouping: p,
-                        secondary_grouping: s,
+                        grouping: (p, s).into(),
                         min_grouping: mg,
                         frac_digits: d,
                         positive_prefix: "",
@@ -697,8 +719,7 @@ mod tests {
                     let num = NumberFormat::new(NumberParams {
                         decimal: ".",
                         group: ",",
-                        primary_grouping: p,
-                        secondary_grouping: s,
+                        grouping: (p, s).into(),
                         min_grouping: mg,
                         frac_digits: d,
                         positive_prefix: "",

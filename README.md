@@ -7,14 +7,14 @@ Pretty printer for currency and number on Rust
 - 数字は ASCII のみ。
 - CLDR のデータは含まない。書式の値は自分で渡すか、`tools/gen.py` で CLDR から作る。
 - 速い経路: 3 桁区切りかインド式（3, 2）、minimumGroupingDigits 1 か 2、小数桁数が Currency 0・2 / Number 0〜8。
-  それ以外（区切りなし、他の幅、通貨の小数 3 桁など）も正しく出力する（FBL 方式の遅い経路）。
+  それ以外（他の幅、通貨の小数 3 桁など）も正しく出力する（FBL 方式の遅い経路）。
 
 ```rust
 use pprint_currency::{CurrencyFormat, CurrencyParams, NumberFormat, NumberParams};
 
 // 作るときに検証と前計算を済ませるので、作ったものは使い回す
 let jpy = CurrencyFormat::new(CurrencyParams {
-    decimal: ".", group: ",", primary_grouping: 3, secondary_grouping: 3, min_grouping: 1, frac_digits: 0,
+    decimal: ".", group: ",", grouping: 3.into(), min_grouping: 1, frac_digits: 0,
     positive_prefix: "￥", positive_suffix: "", negative_prefix: "-￥", negative_suffix: "",
 })?;
 let mut out = String::new();
@@ -22,7 +22,7 @@ jpy.write_i64(&mut out, -1234567);   // out に "-￥1,234,567" を追記
 jpy.write_i32(&mut out, 1000);       // out に "￥1,000" を追記
 
 let units = NumberFormat::new(NumberParams {
-    decimal: ".", group: ",", primary_grouping: 3, secondary_grouping: 3, min_grouping: 1, frac_digits: 6,
+    decimal: ".", group: ",", grouping: 3.into(), min_grouping: 1, frac_digits: 6,
     positive_prefix: "", positive_suffix: "", negative_prefix: "-", negative_suffix: "",
 })?;
 assert_eq!(units.format_i64(1234567890), "1,234.567890");
@@ -32,7 +32,7 @@ assert_eq!(units.format_i64(1234567890), "1,234.567890");
 
 どの特殊化を入れるかを Cargo の features で選べる。どれを切っても出力は同じで、
 切った分は遅い経路（FBL 方式）で処理される。速い経路を通るのは、
-「区切り方」「minimumGroupingDigits」「小数桁数」の特殊化がすべて有効なときだけ。区切りなしは常に遅い経路。
+「区切り方」「minimumGroupingDigits」「小数桁数」の特殊化がすべて有効なときだけ。
 
 | 種類 | feature | 既定 |
 |---|---|---|
