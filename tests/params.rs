@@ -21,12 +21,12 @@ fn reference(p: &CurrencyParams, v: i64) -> String {
     for (i, c) in digits.iter().enumerate() {
         let from_right = digits.len() - i; // この桁を含めて右に残る桁数
         if grouping && i > 0 && from_right >= pr && (from_right - pr).is_multiple_of(sc) {
-            body.push_str(p.group);
+            body.push_str(&p.group);
         }
         body.push(*c);
     }
     if d > 0 {
-        body.push_str(p.decimal);
+        body.push_str(&p.decimal);
         body.push_str(frac);
     }
     if v < 0 {
@@ -78,36 +78,36 @@ fn custom_params_match_reference() {
             for d in [0u8, 1, 2, 3, 4, 5, 8, 9, 10, 15, 19] {
                 for (group, decimal) in [(",", "."), ("\u{202f}", ","), ("", "")] {
                     let cp = CurrencyParams {
-                        decimal,
-                        group,
+                        decimal: decimal.into(),
+                        group: group.into(),
                         grouping: g,
                         min_grouping: mg,
                         frac_digits: d,
-                        positive_prefix: "+[",
-                        positive_suffix: "]",
-                        negative_prefix: "−(",
-                        negative_suffix: ") 円",
+                        positive_prefix: "+[".into(),
+                        positive_suffix: "]".into(),
+                        negative_prefix: "−(".into(),
+                        negative_suffix: ") 円".into(),
                     };
                     // 数値は負の前（負符号）だけを使い、他の前後の文字列は無視する
                     let np = CurrencyParams {
-                        positive_prefix: "",
-                        positive_suffix: "",
-                        negative_suffix: "",
-                        ..cp
+                        positive_prefix: "".into(),
+                        positive_suffix: "".into(),
+                        negative_suffix: "".into(),
+                        ..cp.clone()
                     };
                     let f = NumberFormat::new(NumberParams {
-                        decimal,
-                        group,
+                        decimal: decimal.into(),
+                        group: group.into(),
                         grouping: g,
                         min_grouping: mg,
                         frac_digits: d,
-                        positive_prefix: cp.positive_prefix,
-                        positive_suffix: cp.positive_suffix,
-                        negative_prefix: cp.negative_prefix,
-                        negative_suffix: cp.negative_suffix,
+                        positive_prefix: cp.positive_prefix.clone(),
+                        positive_suffix: cp.positive_suffix.clone(),
+                        negative_prefix: cp.negative_prefix.clone(),
+                        negative_suffix: cp.negative_suffix.clone(),
                     })
                     .unwrap();
-                    let c = CurrencyFormat::new(cp).unwrap();
+                    let c = CurrencyFormat::new(cp.clone()).unwrap();
                     for &v in &vals {
                         let want_n = reference(&np, v);
                         let want_c = reference(&cp, v);
@@ -143,20 +143,20 @@ fn custom_params_match_reference() {
 #[test]
 fn rejects_invalid_params() {
     let base = NumberParams {
-        decimal: ".",
-        group: ",",
+        decimal: ".".into(),
+        group: ",".into(),
         grouping: 3.into(),
         min_grouping: 1,
         frac_digits: 2,
-        positive_prefix: "",
-        positive_suffix: "",
-        negative_prefix: "-",
-        negative_suffix: "",
+        positive_prefix: "".into(),
+        positive_suffix: "".into(),
+        negative_prefix: "-".into(),
+        negative_suffix: "".into(),
     };
     assert_eq!(
         NumberFormat::new(NumberParams {
             frac_digits: 20,
-            ..base
+            ..base.clone()
         })
         .unwrap_err(),
         FormatError::FracDigitsTooLarge
@@ -164,7 +164,7 @@ fn rejects_invalid_params() {
     assert_eq!(
         NumberFormat::new(NumberParams {
             min_grouping: 0,
-            ..base
+            ..base.clone()
         })
         .unwrap_err(),
         FormatError::MinGroupingZero
@@ -173,7 +173,7 @@ fn rejects_invalid_params() {
         assert_eq!(
             NumberFormat::new(NumberParams {
                 grouping: g,
-                ..base
+                ..base.clone()
             })
             .unwrap_err(),
             FormatError::GroupingTooLarge,
@@ -184,7 +184,7 @@ fn rejects_invalid_params() {
         assert_eq!(
             NumberFormat::new(NumberParams {
                 grouping: g,
-                ..base
+                ..base.clone()
             })
             .unwrap_err(),
             FormatError::GroupingZero,
@@ -193,45 +193,46 @@ fn rejects_invalid_params() {
     }
     assert_eq!(
         CurrencyFormat::new(CurrencyParams {
-            decimal: base.decimal,
-            group: base.group,
+            decimal: base.decimal.clone(),
+            group: base.group.clone(),
             grouping: (3, 0).into(),
             min_grouping: base.min_grouping,
             frac_digits: base.frac_digits,
-            positive_prefix: base.positive_prefix,
-            positive_suffix: base.positive_suffix,
-            negative_prefix: base.negative_prefix,
-            negative_suffix: base.negative_suffix,
+            positive_prefix: base.positive_prefix.clone(),
+            positive_suffix: base.positive_suffix.clone(),
+            negative_prefix: base.negative_prefix.clone(),
+            negative_suffix: base.negative_suffix.clone(),
         })
         .unwrap_err(),
         FormatError::GroupingZero
     );
 }
 
-/// tools/gen.py --rust が出力する形の定数（Grouping::new）が書けて、そのまま使えること
+/// tools/gen.py --rust が出力する形の定数（Cow::Borrowed と Grouping::new）が書けて、そのまま使えること
 #[test]
 fn const_params_like_gen_py_output() {
+    use std::borrow::Cow;
     const EN_IN_NUMBER: NumberParams<'static> = NumberParams {
-        decimal: ".",
-        group: ",",
+        decimal: Cow::Borrowed("."),
+        group: Cow::Borrowed(","),
         grouping: Grouping::new(3, 2),
         min_grouping: 1,
-        positive_prefix: "",
-        positive_suffix: "",
-        negative_prefix: "-",
-        negative_suffix: "",
+        positive_prefix: Cow::Borrowed(""),
+        positive_suffix: Cow::Borrowed(""),
+        negative_prefix: Cow::Borrowed("-"),
+        negative_suffix: Cow::Borrowed(""),
         frac_digits: 0,
     };
     const DE_EUR: CurrencyParams<'static> = CurrencyParams {
-        decimal: ",",
-        group: ".",
+        decimal: Cow::Borrowed(","),
+        group: Cow::Borrowed("."),
         grouping: Grouping::new(3, 3),
         min_grouping: 1,
         frac_digits: 2,
-        positive_prefix: "",
-        positive_suffix: "\u{a0}€",
-        negative_prefix: "-",
-        negative_suffix: "\u{a0}€",
+        positive_prefix: Cow::Borrowed(""),
+        positive_suffix: Cow::Borrowed("\u{a0}€"),
+        negative_prefix: Cow::Borrowed("-"),
+        negative_suffix: Cow::Borrowed("\u{a0}€"),
     };
     let n = NumberFormat::new(NumberParams {
         frac_digits: 2,

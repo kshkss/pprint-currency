@@ -36,15 +36,15 @@ fn currency(p: &Value, l: &str, code: &str) -> Option<CurrencyFormat<'static>> {
         return None;
     }
     let f = CurrencyFormat::new(CurrencyParams {
-        decimal: st(c, "decimal"),
-        group: st(c, "group"),
+        decimal: st(c, "decimal").into(),
+        group: st(c, "group").into(),
         grouping: (n8(c, "primary_grouping"), n8(c, "secondary_grouping")).into(),
         min_grouping: n8(c, "min_grouping"),
         frac_digits: n8(c, "frac_digits"),
-        positive_prefix: st(c, "positive_prefix"),
-        positive_suffix: st(c, "positive_suffix"),
-        negative_prefix: st(c, "negative_prefix"),
-        negative_suffix: st(c, "negative_suffix"),
+        positive_prefix: st(c, "positive_prefix").into(),
+        positive_suffix: st(c, "positive_suffix").into(),
+        negative_prefix: st(c, "negative_prefix").into(),
+        negative_suffix: st(c, "negative_suffix").into(),
     })
     .unwrap();
     Some(f)
@@ -56,15 +56,15 @@ fn number(p: &Value, l: &str, d: u8) -> Option<NumberFormat<'static>> {
         return None;
     }
     let f = NumberFormat::new(NumberParams {
-        decimal: st(c, "decimal"),
-        group: st(c, "group"),
+        decimal: st(c, "decimal").into(),
+        group: st(c, "group").into(),
         grouping: (n8(c, "primary_grouping"), n8(c, "secondary_grouping")).into(),
         min_grouping: n8(c, "min_grouping"),
         frac_digits: d,
-        positive_prefix: st(c, "positive_prefix"),
-        positive_suffix: st(c, "positive_suffix"),
-        negative_prefix: st(c, "negative_prefix"),
-        negative_suffix: st(c, "negative_suffix"),
+        positive_prefix: st(c, "positive_prefix").into(),
+        positive_suffix: st(c, "positive_suffix").into(),
+        negative_prefix: st(c, "negative_prefix").into(),
+        negative_suffix: st(c, "negative_suffix").into(),
     })
     .unwrap();
     Some(f)

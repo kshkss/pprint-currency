@@ -20,15 +20,15 @@ fn bench(name: &str, f: &dyn Fn(&mut String, usize)) {
 
 fn cur(p: (u8, u8), d: u8, pre: &'static str, npre: &'static str) -> CurrencyFormat<'static> {
     CurrencyFormat::new(CurrencyParams {
-        decimal: ".",
-        group: ",",
+        decimal: ".".into(),
+        group: ",".into(),
         grouping: p.into(),
         min_grouping: 1,
         frac_digits: d,
-        positive_prefix: pre,
-        positive_suffix: "",
-        negative_prefix: npre,
-        negative_suffix: "",
+        positive_prefix: pre.into(),
+        positive_suffix: "".into(),
+        negative_prefix: npre.into(),
+        negative_suffix: "".into(),
     })
     .unwrap()
 }
@@ -49,29 +49,29 @@ fn main() {
             cur(g, 2, "€", "-€"),
         ];
         let num2 = NumberFormat::new(NumberParams {
-            decimal: ".",
-            group: ",",
+            decimal: ".".into(),
+            group: ",".into(),
             grouping: g.into(),
             min_grouping: 1,
             frac_digits: 2,
-            positive_prefix: "",
-            positive_suffix: "",
-            negative_prefix: "-",
-            negative_suffix: "",
+            positive_prefix: "".into(),
+            positive_suffix: "".into(),
+            negative_prefix: "-".into(),
+            negative_suffix: "".into(),
         })
         .unwrap();
         let num8 = NumberFormat::new(NumberParams {
             frac_digits: 8,
             ..NumberParams {
-                decimal: ".",
-                group: ",",
+                decimal: ".".into(),
+                group: ",".into(),
                 grouping: g.into(),
                 min_grouping: 1,
                 frac_digits: 0,
-                positive_prefix: "",
-                positive_suffix: "",
-                negative_prefix: "-",
-                negative_suffix: "",
+                positive_prefix: "".into(),
+                positive_suffix: "".into(),
+                negative_prefix: "-".into(),
+                negative_suffix: "".into(),
             }
         })
         .unwrap();
@@ -106,15 +106,15 @@ fn main() {
     }
     println!("-- minimumGroupingDigits 3（通貨、小数2桁）");
     let mg3 = CurrencyFormat::new(CurrencyParams {
-        decimal: ",",
-        group: ".",
+        decimal: ",".into(),
+        group: ".".into(),
         grouping: 3.into(),
         min_grouping: 3,
         frac_digits: 2,
-        positive_prefix: "",
-        positive_suffix: " €",
-        negative_prefix: "-",
-        negative_suffix: " €",
+        positive_prefix: "".into(),
+        positive_suffix: " €".into(),
+        negative_prefix: "-".into(),
+        negative_suffix: " €".into(),
     })
     .unwrap();
     bench("Currency write_i64 〜5桁", &|b, i| {

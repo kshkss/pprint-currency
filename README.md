@@ -14,16 +14,18 @@ use pprint_currency::{CurrencyFormat, CurrencyParams, NumberFormat, NumberParams
 
 // 作るときに検証と前計算を済ませるので、作ったものは使い回す
 let jpy = CurrencyFormat::new(CurrencyParams {
-    decimal: ".", group: ",", grouping: 3.into(), min_grouping: 1, frac_digits: 0,
-    positive_prefix: "￥", positive_suffix: "", negative_prefix: "-￥", negative_suffix: "",
+    decimal: ".".into(), group: ",".into(), grouping: 3.into(), min_grouping: 1, frac_digits: 0,
+    positive_prefix: "￥".into(), positive_suffix: "".into(),
+    negative_prefix: "-￥".into(), negative_suffix: "".into(),
 })?;
 let mut out = String::new();
 jpy.write_i64(&mut out, -1234567);   // out に "-￥1,234,567" を追記
 jpy.write_i32(&mut out, 1000);       // out に "￥1,000" を追記
 
 let units = NumberFormat::new(NumberParams {
-    decimal: ".", group: ",", grouping: 3.into(), min_grouping: 1, frac_digits: 6,
-    positive_prefix: "", positive_suffix: "", negative_prefix: "-", negative_suffix: "",
+    decimal: ".".into(), group: ",".into(), grouping: 3.into(), min_grouping: 1, frac_digits: 6,
+    positive_prefix: "".into(), positive_suffix: "".into(),
+    negative_prefix: "-".into(), negative_suffix: "".into(),
 })?;
 assert_eq!(units.format_i64(1234567890), "1,234.567890");
 ```
@@ -57,7 +59,7 @@ cldr-core/supplemental/{currencyData,numberingSystems}.json を置いたフォ�
 ```sh
 # 必要な通貨だけ Rust の定数として出力（自分のクレートに貼る）
 python3 tools/gen.py --rust <root> ja:JPY,USD,EUR en:USD > src/formats.rs
-#   pub const JA_JPY: CurrencyParams<'static> = CurrencyParams { ..., grouping: Grouping::new(3, 3), ... };
+#   pub const JA_JPY: CurrencyParams<'static> = CurrencyParams { decimal: Cow::Borrowed("."), ..., grouping: Grouping::new(3, 3), ... };
 #   pub const JA_NUMBER: NumberParams<'static> = NumberParams { ..., frac_digits: 0 };  // 小数桁数は用途に合わせて上書き
 
 # 全通貨を JSON で出力（テストや実行時の読み込み用）

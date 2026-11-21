@@ -14,16 +14,18 @@
 //! use pprint_currency::{CurrencyFormat, CurrencyParams, NumberFormat, NumberParams};
 //!
 //! let jpy = CurrencyFormat::new(CurrencyParams {
-//!     decimal: ".", group: ",", grouping: 3.into(), min_grouping: 1, frac_digits: 0,
-//!     positive_prefix: "￥", positive_suffix: "", negative_prefix: "-￥", negative_suffix: "",
+//!     decimal: ".".into(), group: ",".into(), grouping: 3.into(), min_grouping: 1, frac_digits: 0,
+//!     positive_prefix: "￥".into(), positive_suffix: "".into(),
+//!     negative_prefix: "-￥".into(), negative_suffix: "".into(),
 //! }).unwrap();
 //! let mut s = String::new();
 //! jpy.write_i64(&mut s, -1234567);
 //! assert_eq!(s, "-￥1,234,567");
 //!
 //! let de = NumberFormat::new(NumberParams {
-//!     decimal: ",", group: ".", grouping: 3.into(), min_grouping: 1, frac_digits: 2,
-//!     positive_prefix: "", positive_suffix: "", negative_prefix: "-", negative_suffix: "",
+//!     decimal: ",".into(), group: ".".into(), grouping: 3.into(), min_grouping: 1, frac_digits: 2,
+//!     positive_prefix: "".into(), positive_suffix: "".into(),
+//!     negative_prefix: "-".into(), negative_suffix: "".into(),
 //! }).unwrap();
 //! assert_eq!(de.format_i32(123456), "1.234,56");
 //! ```
@@ -112,12 +114,12 @@ impl From<(u8, u8)> for Grouping {
 }
 
 /// 数値の書式を作るための値
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct NumberParams<'a> {
     /// 小数点（例: "." / ","）
-    pub decimal: &'a str,
+    pub decimal: Cow<'a, str>,
     /// 桁区切り（例: "," / "." / "\u{202f}"）
-    pub group: &'a str,
+    pub group: Cow<'a, str>,
     /// グループ幅（例: `3.into()`、インド式なら `(3, 2).into()`）。0 は不可
     pub grouping: Grouping,
     /// 整数部がこの桁数＋第1グループの幅以上のときだけ区切る（CLDR の minimumGroupingDigits。通常 1）
@@ -125,22 +127,22 @@ pub struct NumberParams<'a> {
     /// 小数桁数（値のスケール）
     pub frac_digits: u8,
     /// 正の値の前に付ける文字列。NumberFormat は使わない（無視する）
-    pub positive_prefix: &'a str,
+    pub positive_prefix: Cow<'a, str>,
     /// 正の値の後に付ける文字列。NumberFormat は使わない（無視する）
-    pub positive_suffix: &'a str,
+    pub positive_suffix: Cow<'a, str>,
     /// 負の値の前に付ける文字列＝負符号（通常 "-"）
-    pub negative_prefix: &'a str,
+    pub negative_prefix: Cow<'a, str>,
     /// 負の値の後に付ける文字列。NumberFormat は使わない（無視する）
-    pub negative_suffix: &'a str,
+    pub negative_suffix: Cow<'a, str>,
 }
 
 /// 通貨の書式を作るための値。前後の文字列には通貨記号と空白を含める（例: 負の前 "-￥"、"-1.234,56 €" なら負の後 " €"）
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct CurrencyParams<'a> {
     /// 小数点
-    pub decimal: &'a str,
+    pub decimal: Cow<'a, str>,
     /// 桁区切り
-    pub group: &'a str,
+    pub group: Cow<'a, str>,
     /// グループ幅（例: `3.into()`、インド式なら `(3, 2).into()`）。0 は不可
     pub grouping: Grouping,
     /// CLDR の minimumGroupingDigits（通常 1）
@@ -148,13 +150,13 @@ pub struct CurrencyParams<'a> {
     /// 小数桁数（その通貨の値のスケール）
     pub frac_digits: u8,
     /// 正の値の前（例: "￥", "$", "CHF "）
-    pub positive_prefix: &'a str,
+    pub positive_prefix: Cow<'a, str>,
     /// 正の値の後（例: "", " €"）
-    pub positive_suffix: &'a str,
+    pub positive_suffix: Cow<'a, str>,
     /// 負の値の前（例: "-￥", "CHF-"）
-    pub negative_prefix: &'a str,
+    pub negative_prefix: Cow<'a, str>,
     /// 負の値の後
-    pub negative_suffix: &'a str,
+    pub negative_suffix: Cow<'a, str>,
 }
 
 /// 速い経路で扱う小数桁数の集合（ビット k が立っていれば k 桁）。features で決まる
@@ -221,9 +223,9 @@ impl<'a> NumberFormat<'a> {
         // 数字は最大 20 桁（u64）＋0 の補い 1 桁。区切りは数字の数より少ない
         let max_len = p.negative_prefix.len() + 21 + 20 * p.group.len() + p.decimal.len();
         Ok(NumberFormat {
-            decimal: Cow::Borrowed(p.decimal),
-            group: Cow::Borrowed(p.group),
-            minus_sign: Cow::Borrowed(p.negative_prefix),
+            decimal: p.decimal,
+            group: p.group,
+            minus_sign: p.negative_prefix,
             primary,
             secondary,
             min_grouping: p.min_grouping,
@@ -466,16 +468,10 @@ impl<'a> CurrencyFormat<'a> {
         // 数字は最大 20 桁（u64）＋0 の補い 1 桁。区切りは数字の数より少ない
         let max_len = aff + 21 + 20 * p.group.len() + p.decimal.len();
         Ok(CurrencyFormat {
-            decimal: Cow::Borrowed(p.decimal),
-            group: Cow::Borrowed(p.group),
-            nonneg_affix: [
-                Cow::Borrowed(p.positive_prefix),
-                Cow::Borrowed(p.positive_suffix),
-            ],
-            neg_affix: [
-                Cow::Borrowed(p.negative_prefix),
-                Cow::Borrowed(p.negative_suffix),
-            ],
+            decimal: p.decimal,
+            group: p.group,
+            nonneg_affix: [p.positive_prefix, p.positive_suffix],
+            neg_affix: [p.negative_prefix, p.negative_suffix],
             primary,
             secondary,
             min_grouping: p.min_grouping,
@@ -705,15 +701,15 @@ mod tests {
             for mg in 1..=4 {
                 for d in 0..=19 {
                     let cur = CurrencyFormat::new(CurrencyParams {
-                        decimal: ".",
-                        group: ",",
+                        decimal: ".".into(),
+                        group: ",".into(),
                         grouping: (p, s).into(),
                         min_grouping: mg,
                         frac_digits: d,
-                        positive_prefix: "",
-                        positive_suffix: "",
-                        negative_prefix: "-",
-                        negative_suffix: "",
+                        positive_prefix: "".into(),
+                        positive_suffix: "".into(),
+                        negative_prefix: "-".into(),
+                        negative_suffix: "".into(),
                     })
                     .unwrap();
                     assert_eq!(
@@ -722,15 +718,15 @@ mod tests {
                         "currency {p},{s} mg={mg} d={d}"
                     );
                     let num = NumberFormat::new(NumberParams {
-                        decimal: ".",
-                        group: ",",
+                        decimal: ".".into(),
+                        group: ",".into(),
                         grouping: (p, s).into(),
                         min_grouping: mg,
                         frac_digits: d,
-                        positive_prefix: "",
-                        positive_suffix: "",
-                        negative_prefix: "-",
-                        negative_suffix: "",
+                        positive_prefix: "".into(),
+                        positive_suffix: "".into(),
+                        negative_prefix: "-".into(),
+                        negative_suffix: "".into(),
                     })
                     .unwrap();
                     assert_eq!(
