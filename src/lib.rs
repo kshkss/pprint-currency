@@ -2,6 +2,8 @@
 //!
 //! - 書式の情報（区切り・小数点・小数桁数・負符号や前後の文字列）は [`NumberParams`] / [`CurrencyParams`] で渡し、
 //!   `new` で [`NumberFormat`] / [`CurrencyFormat`] を作る。作るときに検証と前計算を済ませるので、作ったものは使い回す。
+//! - 書式文字列（CLDR と同じ構文。例: `"¤#,##0.00"`）から作ることもできる。
+//!   [`NumberPattern`] / [`CurrencyPattern`] を `from_pattern` に渡す。書式文字列の意味はそれぞれの型の説明を参照。
 //! - CLDR のデータは含まない。CLDR から値を作るなら tools/gen.py を使う。
 //! - 速い経路: 3 桁区切りかインド式（3, 2）、minimumGroupingDigits 1 か 2、小数は Currency 0・2 桁 / Number 0〜8 桁。
 //!   それ以外も正しく出力する（1 文字ごとに区切りを判定する遅い経路）。
@@ -31,8 +33,11 @@
 
 #[macro_use]
 mod kernel;
+mod pattern;
 
 use std::borrow::Cow;
+
+pub use crate::pattern::{CurrencyPattern, NumberPattern, PatternError};
 
 use crate::kernel::{
     count_digits, grouped32, grouped64, Fwd, Kernel, Raw, GROUP2, GROUP3, INDIAN, MIN_GROUP1,

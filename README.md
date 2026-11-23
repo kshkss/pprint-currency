@@ -29,6 +29,40 @@ let units = NumberFormat::new(NumberParams {
 assert_eq!(units.format_i64(1234567890), "1,234.567890");
 ```
 
+## 書式文字列から作る
+
+CLDR と同じ構文の書式文字列から作ることもできる。CLDR のデータは含まないので、書式文字列と記号は自分で渡す。
+
+```rust
+use pprint_currency::{CurrencyFormat, CurrencyPattern, NumberFormat, NumberPattern};
+
+let chf = CurrencyFormat::from_pattern(CurrencyPattern {
+    pattern: "¤ #,##0.00;¤-#,##0.00",
+    currency_symbol: "CHF".into(),
+    decimal: ".".into(), group: "’".into(), minus_sign: "-".into(),
+    min_grouping: 1, frac_digits: 2,
+})?;
+assert_eq!(chf.format_i64(123456), "CHF 1’234.56");
+assert_eq!(chf.format_i64(-123456), "CHF-1’234.56");
+
+let de = NumberFormat::from_pattern(NumberPattern {
+    pattern: "#,##0.###",
+    decimal: ",".into(), group: ".".into(), minus_sign: "-".into(),
+    min_grouping: 1, frac_digits: 2,
+})?;
+assert_eq!(de.format_i64(-123456), "-1.234,56");
+```
+
+- 書式文字列の中の `.`・`,`・`-`・`¤` はプレースホルダで、それぞれ `decimal`（小数点）・`group`（桁区切り）・
+  `minus_sign`（負符号）・`currency_symbol`（通貨記号）に置き換わる
+- 空白を含め、それ以外の文字は書いたとおりに出る（`'...'` で囲んだ文字も同じ）
+- `¤` には `currency_symbol` をそのまま入れる。記号と数字の間に空白を自動で足すことはしない
+  （CLDR の currencySpacing は扱わない）。空白が要るなら、書式文字列か `currency_symbol` に含める
+- `¤` がいくつ続いても（`¤¤` など）1 つの通貨記号として扱う
+- 小数部の桁数は書式文字列からではなく `frac_digits` で決まる
+- 数値の書式文字列に書けるのは数値部（`#,##0.###` など）だけ。負の数は `minus_sign` + 数値部になる
+- 解釈できない文字（`%`、指数の `E`、パディングの `*` など）があると、その文字と位置をエラーで返す
+
 ## features（特殊化の選択）
 
 どの特殊化を入れるかを Cargo の features で選べる。どれを切っても出力は同じで、
