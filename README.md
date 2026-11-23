@@ -7,32 +7,67 @@ Pretty printer for currency and number on Rust
 - 数字は ASCII のみ。
 - CLDR のデータは含まない。書式の値は自分で渡すか、`tools/gen.py` で CLDR から作る。
 - 速い経路: 3 桁区切りかインド式（3, 2）、minimumGroupingDigits 1 か 2、小数桁数が Currency 0・2 / Number 0〜8。
-  それ以外（区切りなし、他の幅、通貨の小数 3 桁など）も正しく出力する（FBL 方式の遅い経路）。
+  それ以外（他の幅、通貨の小数 3 桁など）も正しく出力する（FBL 方式の遅い経路）。
 
 ```rust
 use pprint_currency::{CurrencyFormat, CurrencyParams, NumberFormat, NumberParams};
 
 // 作るときに検証と前計算を済ませるので、作ったものは使い回す
 let jpy = CurrencyFormat::new(CurrencyParams {
-    decimal: ".", group: ",", primary_grouping: 3, secondary_grouping: 3, min_grouping: 1, frac_digits: 0,
-    positive_prefix: "￥", positive_suffix: "", negative_prefix: "-￥", negative_suffix: "",
+    decimal: ".".into(), group: ",".into(), grouping: 3.into(), min_grouping: 1, frac_digits: 0,
+    positive_prefix: "￥".into(), positive_suffix: "".into(),
+    negative_prefix: "-￥".into(), negative_suffix: "".into(),
 })?;
 let mut out = String::new();
 jpy.write_i64(&mut out, -1234567);   // out に "-￥1,234,567" を追記
 jpy.write_i32(&mut out, 1000);       // out に "￥1,000" を追記
 
 let units = NumberFormat::new(NumberParams {
-    decimal: ".", group: ",", primary_grouping: 3, secondary_grouping: 3, min_grouping: 1, frac_digits: 6,
-    positive_prefix: "", positive_suffix: "", negative_prefix: "-", negative_suffix: "",
+    decimal: ".".into(), group: ",".into(), grouping: 3.into(), min_grouping: 1, frac_digits: 6,
+    minus_sign: "-".into(),
 })?;
 assert_eq!(units.format_i64(1234567890), "1,234.567890");
 ```
+
+## 書式文字列から作る
+
+CLDR と同じ構文の書式文字列から作ることもできる。CLDR のデータは含まないので、書式文字列と記号は自分で渡す。
+
+```rust
+use pprint_currency::{CurrencyFormat, CurrencyPattern, NumberFormat, NumberPattern};
+
+let chf = CurrencyFormat::from_pattern(CurrencyPattern {
+    pattern: "¤ #,##0.00;¤-#,##0.00",
+    currency_symbol: "CHF".into(),
+    decimal: ".".into(), group: "’".into(), minus_sign: "-".into(),
+    min_grouping: 1, frac_digits: 2,
+})?;
+assert_eq!(chf.format_i64(123456), "CHF 1’234.56");
+assert_eq!(chf.format_i64(-123456), "CHF-1’234.56");
+
+let de = NumberFormat::from_pattern(NumberPattern {
+    pattern: "#,##0.###",
+    decimal: ",".into(), group: ".".into(), minus_sign: "-".into(),
+    min_grouping: 1, frac_digits: 2,
+})?;
+assert_eq!(de.format_i64(-123456), "-1.234,56");
+```
+
+- 書式文字列の中の `.`・`,`・`-`・`¤` はプレースホルダで、それぞれ `decimal`（小数点）・`group`（桁区切り）・
+  `minus_sign`（負符号）・`currency_symbol`（通貨記号）に置き換わる
+- 空白を含め、それ以外の文字は書いたとおりに出る（`'...'` で囲んだ文字も同じ）
+- `¤` には `currency_symbol` をそのまま入れる。記号と数字の間に空白を自動で足すことはしない
+  （CLDR の currencySpacing は扱わない）。空白が要るなら、書式文字列か `currency_symbol` に含める
+- `¤` がいくつ続いても（`¤¤` など）1 つの通貨記号として扱う
+- 小数部の桁数は書式文字列からではなく `frac_digits` で決まる
+- 数値の書式文字列に書けるのは数値部（`#,##0.###` など）だけ。負の数は `minus_sign` + 数値部になる
+- 解釈できない文字（`%`、指数の `E`、パディングの `*` など）があると、その文字と位置をエラーで返す
 
 ## features（特殊化の選択）
 
 どの特殊化を入れるかを Cargo の features で選べる。どれを切っても出力は同じで、
 切った分は遅い経路（FBL 方式）で処理される。速い経路を通るのは、
-「区切り方」「minimumGroupingDigits」「小数桁数」の特殊化がすべて有効なときだけ。区切りなしは常に遅い経路。
+「区切り方」「minimumGroupingDigits」「小数桁数」の特殊化がすべて有効なときだけ。
 
 | 種類 | feature | 既定 |
 |---|---|---|
@@ -57,7 +92,7 @@ cldr-core/supplemental/{currencyData,numberingSystems}.json を置いたフォ�
 ```sh
 # 必要な通貨だけ Rust の定数として出力（自分のクレートに貼る）
 python3 tools/gen.py --rust <root> ja:JPY,USD,EUR en:USD > src/formats.rs
-#   pub const JA_JPY: CurrencyParams<'static> = CurrencyParams { ... };
+#   pub const JA_JPY: CurrencyParams<'static> = CurrencyParams { decimal: Cow::Borrowed("."), ..., grouping: Grouping::new(3, 3), ... };
 #   pub const JA_NUMBER: NumberParams<'static> = NumberParams { ..., frac_digits: 0 };  // 小数桁数は用途に合わせて上書き
 
 # 全通貨を JSON で出力（テストや実行時の読み込み用）

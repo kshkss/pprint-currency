@@ -25,45 +25,53 @@ fn n8(v: &Value, k: &str) -> u8 {
     v[k].as_u64().unwrap() as u8
 }
 
-fn currency(p: &Value, l: &str, code: &str) -> CurrencyFormat<'static> {
-    let c = &p[l]["currencies"][code];
-    CurrencyFormat::new(CurrencyParams {
-        decimal: st(c, "decimal"),
-        group: st(c, "group"),
-        primary_grouping: n8(c, "primary_grouping"),
-        secondary_grouping: n8(c, "secondary_grouping"),
-        min_grouping: n8(c, "min_grouping"),
-        frac_digits: n8(c, "frac_digits"),
-        positive_prefix: st(c, "positive_prefix"),
-        positive_suffix: st(c, "positive_suffix"),
-        negative_prefix: st(c, "negative_prefix"),
-        negative_suffix: st(c, "negative_suffix"),
-    })
-    .unwrap()
+/// 区切らない書式（グループ幅 0）には対応しないので照合しない
+fn ungrouped(c: &Value) -> bool {
+    n8(c, "primary_grouping") == 0
 }
 
-fn number(p: &Value, l: &str, d: u8) -> NumberFormat<'static> {
+fn currency(p: &Value, l: &str, code: &str) -> Option<CurrencyFormat<'static>> {
+    let c = &p[l]["currencies"][code];
+    if ungrouped(c) {
+        return None;
+    }
+    let f = CurrencyFormat::new(CurrencyParams {
+        decimal: st(c, "decimal").into(),
+        group: st(c, "group").into(),
+        grouping: (n8(c, "primary_grouping"), n8(c, "secondary_grouping")).into(),
+        min_grouping: n8(c, "min_grouping"),
+        frac_digits: n8(c, "frac_digits"),
+        positive_prefix: st(c, "positive_prefix").into(),
+        positive_suffix: st(c, "positive_suffix").into(),
+        negative_prefix: st(c, "negative_prefix").into(),
+        negative_suffix: st(c, "negative_suffix").into(),
+    })
+    .unwrap();
+    Some(f)
+}
+
+fn number(p: &Value, l: &str, d: u8) -> Option<NumberFormat<'static>> {
     let c = &p[l]["number"];
-    NumberFormat::new(NumberParams {
-        decimal: st(c, "decimal"),
-        group: st(c, "group"),
-        primary_grouping: n8(c, "primary_grouping"),
-        secondary_grouping: n8(c, "secondary_grouping"),
+    if ungrouped(c) {
+        return None;
+    }
+    let f = NumberFormat::new(NumberParams {
+        decimal: st(c, "decimal").into(),
+        group: st(c, "group").into(),
+        grouping: (n8(c, "primary_grouping"), n8(c, "secondary_grouping")).into(),
         min_grouping: n8(c, "min_grouping"),
         frac_digits: d,
-        positive_prefix: st(c, "positive_prefix"),
-        positive_suffix: st(c, "positive_suffix"),
-        negative_prefix: st(c, "negative_prefix"),
-        negative_suffix: st(c, "negative_suffix"),
+        minus_sign: st(c, "minus_sign").into(),
     })
-    .unwrap()
+    .unwrap();
+    Some(f)
 }
 
 #[test]
 fn currency_matches_intl() {
     let Some((p, g)) = data() else { return };
-    let mut n = 0;
-    let mut cache: Option<(String, String, CurrencyFormat)> = None;
+    let (mut n, mut skipped) = (0, 0);
+    let mut cache: Option<(String, String, Option<CurrencyFormat>)> = None;
     for row in g["currency"].as_array().unwrap() {
         let (l, code, m, want) = (
             row[0].as_str().unwrap(),
@@ -74,7 +82,10 @@ fn currency_matches_intl() {
         if cache.as_ref().is_none_or(|c| c.0 != l || c.1 != code) {
             cache = Some((l.into(), code.into(), currency(&p, l, code)));
         }
-        let f = &cache.as_ref().unwrap().2;
+        let Some(f) = &cache.as_ref().unwrap().2 else {
+            skipped += 1;
+            continue;
+        };
         let v: i64 = m.parse().unwrap();
         let mut s = String::from("既存");
         f.write_i64(&mut s, v);
@@ -84,13 +95,13 @@ fn currency_matches_intl() {
         }
         n += 1;
     }
-    println!("currency: {n} 件一致");
+    println!("currency: {n} 件一致、区切りなしの {skipped} 件を省略");
 }
 
 #[test]
 fn number_matches_intl() {
     let Some((p, g)) = data() else { return };
-    let mut n = 0;
+    let (mut n, mut skipped) = (0, 0);
     for row in g["number"].as_array().unwrap() {
         let (l, d, m, want) = (
             row[0].as_str().unwrap(),
@@ -98,7 +109,10 @@ fn number_matches_intl() {
             row[2].as_str().unwrap(),
             row[3].as_str().unwrap(),
         );
-        let f = number(&p, l, d);
+        let Some(f) = number(&p, l, d) else {
+            skipped += 1;
+            continue;
+        };
         let v: i64 = m.parse().unwrap();
         assert_eq!(f.format_i64(v), want, "{l} d={d} {v}");
         if let Ok(v32) = i32::try_from(v) {
@@ -106,5 +120,5 @@ fn number_matches_intl() {
         }
         n += 1;
     }
-    println!("number: {n} 件一致");
+    println!("number: {n} 件一致、区切りなしの {skipped} 件を省略");
 }

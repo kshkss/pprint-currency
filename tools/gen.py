@@ -100,9 +100,11 @@ for loc in locales:
     dp = compile_pattern(n['decimalFormats-numberSystem-' + ns]['standard'])
     if any(x[0] == 'Cur' for k in ('pre', 'suf', 'npre', 'nsuf') for x in dp[k]): raise ValueError('数値パターンに ¤')
     naff = [resolve(dp[k], '', minus) for k in ('pre', 'suf', 'npre', 'nsuf')]
+    # NumberFormat は負の値の前に負符号を付けるだけ。それ以外の前後の文字列が出たら止める
+    if naff[0] or naff[1] or naff[3]: raise ValueError('数値パターンの前後の文字列は負符号以外未対応: %s %r' % (loc, naff))
     number = dict(decimal=sym['decimal'], group=sym['group'], primary_grouping=dp['grouping'][0],
                   secondary_grouping=dp['grouping'][1], min_grouping=mg,
-                  positive_prefix=naff[0], positive_suffix=naff[1], negative_prefix=naff[2], negative_suffix=naff[3])
+                  minus_sign=naff[2])
     # 通貨: currencyFormats
     cf = n['currencyFormats-numberSystem-' + ns]
     cdec = sym.get('currencyDecimal', sym['decimal']); cgrp = sym.get('currencyGroup', sym['group'])
@@ -141,9 +143,15 @@ if not rust_mode:
     print(json.dumps(result, ensure_ascii=False, indent=1))
 else:
     def fields(d):
-        return ', '.join('%s: %s' % (k, rs(v) if isinstance(v, str) else v) for k, v in d.items())
+        out = []
+        for k, v in d.items():
+            if k == 'primary_grouping': out.append('grouping: Grouping::new(%d, %d)' % (v, d['secondary_grouping']))
+            elif k == 'secondary_grouping': pass
+            elif isinstance(v, str): out.append('%s: Cow::Borrowed(%s)' % (k, rs(v)))
+            else: out.append('%s: %s' % (k, v))
+        return ', '.join(out)
     out = ['// 自動生成（tools/gen.py --rust）。データ: Unicode CLDR（cldr-json）',
-           'use pprint_currency::{CurrencyParams, NumberParams};', '']
+           'use std::borrow::Cow;', 'use pprint_currency::{CurrencyParams, Grouping, NumberParams};', '']
     for loc, r in result.items():
         ident = loc.replace('-', '_').upper()
         out.append('/// %s の数値（frac_digits は用途に合わせて上書きする）' % loc)
