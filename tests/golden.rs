@@ -61,10 +61,7 @@ fn number(p: &Value, l: &str, d: u8) -> Option<NumberFormat<'static>> {
         grouping: (n8(c, "primary_grouping"), n8(c, "secondary_grouping")).into(),
         min_grouping: n8(c, "min_grouping"),
         frac_digits: d,
-        positive_prefix: st(c, "positive_prefix").into(),
-        positive_suffix: st(c, "positive_suffix").into(),
-        negative_prefix: st(c, "negative_prefix").into(),
-        negative_suffix: st(c, "negative_suffix").into(),
+        minus_sign: st(c, "minus_sign").into(),
     })
     .unwrap();
     Some(f)

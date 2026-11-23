@@ -24,8 +24,7 @@ jpy.write_i32(&mut out, 1000);       // out に "￥1,000" を追記
 
 let units = NumberFormat::new(NumberParams {
     decimal: ".".into(), group: ",".into(), grouping: 3.into(), min_grouping: 1, frac_digits: 6,
-    positive_prefix: "".into(), positive_suffix: "".into(),
-    negative_prefix: "-".into(), negative_suffix: "".into(),
+    minus_sign: "-".into(),
 })?;
 assert_eq!(units.format_i64(1234567890), "1,234.567890");
 ```

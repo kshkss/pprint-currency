@@ -88,7 +88,7 @@ fn custom_params_match_reference() {
                         negative_prefix: "−(".into(),
                         negative_suffix: ") 円".into(),
                     };
-                    // 数値は負の前（負符号）だけを使い、他の前後の文字列は無視する
+                    // 数値は負の値の前に負符号を付けるだけ
                     let np = CurrencyParams {
                         positive_prefix: "".into(),
                         positive_suffix: "".into(),
@@ -101,10 +101,7 @@ fn custom_params_match_reference() {
                         grouping: g,
                         min_grouping: mg,
                         frac_digits: d,
-                        positive_prefix: cp.positive_prefix.clone(),
-                        positive_suffix: cp.positive_suffix.clone(),
-                        negative_prefix: cp.negative_prefix.clone(),
-                        negative_suffix: cp.negative_suffix.clone(),
+                        minus_sign: cp.negative_prefix.clone(),
                     })
                     .unwrap();
                     let c = CurrencyFormat::new(cp.clone()).unwrap();
@@ -148,10 +145,7 @@ fn rejects_invalid_params() {
         grouping: 3.into(),
         min_grouping: 1,
         frac_digits: 2,
-        positive_prefix: "".into(),
-        positive_suffix: "".into(),
-        negative_prefix: "-".into(),
-        negative_suffix: "".into(),
+        minus_sign: "-".into(),
     };
     assert_eq!(
         NumberFormat::new(NumberParams {
@@ -198,10 +192,10 @@ fn rejects_invalid_params() {
             grouping: (3, 0).into(),
             min_grouping: base.min_grouping,
             frac_digits: base.frac_digits,
-            positive_prefix: base.positive_prefix.clone(),
-            positive_suffix: base.positive_suffix.clone(),
-            negative_prefix: base.negative_prefix.clone(),
-            negative_suffix: base.negative_suffix.clone(),
+            positive_prefix: "".into(),
+            positive_suffix: "".into(),
+            negative_prefix: base.minus_sign.clone(),
+            negative_suffix: "".into(),
         })
         .unwrap_err(),
         FormatError::GroupingZero
@@ -217,10 +211,7 @@ fn const_params_like_gen_py_output() {
         group: Cow::Borrowed(","),
         grouping: Grouping::new(3, 2),
         min_grouping: 1,
-        positive_prefix: Cow::Borrowed(""),
-        positive_suffix: Cow::Borrowed(""),
-        negative_prefix: Cow::Borrowed("-"),
-        negative_suffix: Cow::Borrowed(""),
+        minus_sign: Cow::Borrowed("-"),
         frac_digits: 0,
     };
     const DE_EUR: CurrencyParams<'static> = CurrencyParams {

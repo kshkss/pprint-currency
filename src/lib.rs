@@ -1,6 +1,6 @@
 //! 固定小数点の整数を、ロケールの書式（区切り・小数点・記号）で文字列にする。
 //!
-//! - 書式の情報（区切り・小数点・小数桁数・前後の文字列）は [`NumberParams`] / [`CurrencyParams`] で渡し、
+//! - 書式の情報（区切り・小数点・小数桁数・負符号や前後の文字列）は [`NumberParams`] / [`CurrencyParams`] で渡し、
 //!   `new` で [`NumberFormat`] / [`CurrencyFormat`] を作る。作るときに検証と前計算を済ませるので、作ったものは使い回す。
 //! - CLDR のデータは含まない。CLDR から値を作るなら tools/gen.py を使う。
 //! - 速い経路: 3 桁区切りかインド式（3, 2）、minimumGroupingDigits 1 か 2、小数は Currency 0・2 桁 / Number 0〜8 桁。
@@ -24,8 +24,7 @@
 //!
 //! let de = NumberFormat::new(NumberParams {
 //!     decimal: ",".into(), group: ".".into(), grouping: 3.into(), min_grouping: 1, frac_digits: 2,
-//!     positive_prefix: "".into(), positive_suffix: "".into(),
-//!     negative_prefix: "-".into(), negative_suffix: "".into(),
+//!     minus_sign: "-".into(),
 //! }).unwrap();
 //! assert_eq!(de.format_i32(123456), "1.234,56");
 //! ```
@@ -126,14 +125,8 @@ pub struct NumberParams<'a> {
     pub min_grouping: u8,
     /// 小数桁数（値のスケール）
     pub frac_digits: u8,
-    /// 正の値の前に付ける文字列。NumberFormat は使わない（無視する）
-    pub positive_prefix: Cow<'a, str>,
-    /// 正の値の後に付ける文字列。NumberFormat は使わない（無視する）
-    pub positive_suffix: Cow<'a, str>,
-    /// 負の値の前に付ける文字列＝負符号（通常 "-"）
-    pub negative_prefix: Cow<'a, str>,
-    /// 負の値の後に付ける文字列。NumberFormat は使わない（無視する）
-    pub negative_suffix: Cow<'a, str>,
+    /// 負符号。負の値の前にだけ付ける（通常 "-"）
+    pub minus_sign: Cow<'a, str>,
 }
 
 /// 通貨の書式を作るための値。前後の文字列には通貨記号と空白を含める（例: 負の前 "-￥"、"-1.234,56 €" なら負の後 " €"）
@@ -221,11 +214,11 @@ impl<'a> NumberFormat<'a> {
             _ => Kernel::Generic,
         };
         // 数字は最大 20 桁（u64）＋0 の補い 1 桁。区切りは数字の数より少ない
-        let max_len = p.negative_prefix.len() + 21 + 20 * p.group.len() + p.decimal.len();
+        let max_len = p.minus_sign.len() + 21 + 20 * p.group.len() + p.decimal.len();
         Ok(NumberFormat {
             decimal: p.decimal,
             group: p.group,
-            minus_sign: p.negative_prefix,
+            minus_sign: p.minus_sign,
             primary,
             secondary,
             min_grouping: p.min_grouping,
@@ -723,10 +716,7 @@ mod tests {
                         grouping: (p, s).into(),
                         min_grouping: mg,
                         frac_digits: d,
-                        positive_prefix: "".into(),
-                        positive_suffix: "".into(),
-                        negative_prefix: "-".into(),
-                        negative_suffix: "".into(),
+                        minus_sign: "-".into(),
                     })
                     .unwrap();
                     assert_eq!(

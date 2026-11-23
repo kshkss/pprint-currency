@@ -54,10 +54,7 @@ fn main() {
             grouping: g.into(),
             min_grouping: 1,
             frac_digits: 2,
-            positive_prefix: "".into(),
-            positive_suffix: "".into(),
-            negative_prefix: "-".into(),
-            negative_suffix: "".into(),
+            minus_sign: "-".into(),
         })
         .unwrap();
         let num8 = NumberFormat::new(NumberParams {
@@ -68,10 +65,7 @@ fn main() {
                 grouping: g.into(),
                 min_grouping: 1,
                 frac_digits: 0,
-                positive_prefix: "".into(),
-                positive_suffix: "".into(),
-                negative_prefix: "-".into(),
-                negative_suffix: "".into(),
+                minus_sign: "-".into(),
             }
         })
         .unwrap();
