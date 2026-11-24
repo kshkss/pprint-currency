@@ -63,6 +63,28 @@ assert_eq!(de.format_i64(-123456), "-1.234,56");
 - 数値の書式文字列に書けるのは数値部（`#,##0.###` など）だけ。負の数は `minus_sign` + 数値部になる
 - 解釈できない文字（`%`、指数の `E`、パディングの `*` など）があると、その文字と位置をエラーで返す
 
+## hypertext のテンプレートに埋め込む
+
+feature `hypertext` を有効にすると、[hypertext](https://crates.io/crates/hypertext) のテンプレートへ、
+中間の `String` を作らずに直接書き出せる（既定ではオフ）。
+
+```toml
+pprint-currency = { version = "...", features = ["hypertext"] }
+```
+
+```rust
+use hypertext::prelude::*;
+
+// encode_html で HTML 用の書式に変換しておく（部品の `& < >` を一度だけエスケープする）
+let jpy = jpy.encode_html();
+let html = maud! { td { (jpy.with_i64(-1234567)) } }.render();
+assert_eq!(html.as_inner(), "<td>-￥1,234,567</td>");
+```
+
+- `encode_html` は `NumberFormat<'a, Html>` / `CurrencyFormat<'a, Html>` を返す。書式の型引数の既定は `Plain`
+- `with_i32` / `with_i64` で値と組にしたもの（`Formatted`）が `Renderable` を実装する。書き出しは `write_*` と同じ速さ
+- 対応するのは本文だけ。属性値（`AttributeBuffer`）には対応していない
+
 ## features（特殊化の選択）
 
 どの特殊化を入れるかを Cargo の features で選べる。どれを切っても出力は同じで、

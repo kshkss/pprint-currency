@@ -11,6 +11,8 @@
 //! - 値は「小数桁数をスケールとする整数」で渡す（例: 小数 2 桁なら 1234.56 → 123456）。
 //!   丸めは行わない。
 //! - 数字は ASCII（0-9）のみ。
+//! - feature `hypertext` を有効にすると、`encode_html` で HTML 用に変換した書式を
+//!   hypertext のテンプレートへ直接書き出せる（`Html` と `Formatted` を参照）。
 //!
 //! ```
 //! use pprint_currency::{CurrencyFormat, CurrencyParams, NumberFormat, NumberParams};
@@ -31,18 +33,38 @@
 //! assert_eq!(de.format_i32(123456), "1.234,56");
 //! ```
 
+#[cfg(feature = "hypertext")]
+mod hypertext;
 #[macro_use]
 mod kernel;
 mod pattern;
 
 use std::borrow::Cow;
+use std::marker::PhantomData;
 
 pub use crate::pattern::{CurrencyPattern, NumberPattern, PatternError};
+
+#[cfg(feature = "hypertext")]
+pub use crate::hypertext::{Formatted, Html};
 
 use crate::kernel::{
     count_digits, grouped32, grouped64, Fwd, Kernel, Raw, GROUP2, GROUP3, INDIAN, MIN_GROUP1,
     MIN_GROUP2, MIN_GROUP3,
 };
+
+mod sealed {
+    pub trait Sealed {}
+}
+
+/// 書式の部品（小数点・区切り・負符号・前後の文字列）がどう符号化されているかを表す型。
+/// [`NumberFormat`] / [`CurrencyFormat`] の型引数に使う
+pub trait Encoding: sealed::Sealed + std::fmt::Debug + Clone + Copy {}
+
+/// 部品をそのまま書き出す（既定）
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Plain;
+impl sealed::Sealed for Plain {}
+impl Encoding for Plain {}
 
 /// 書式の値が不正なときのエラー
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -170,9 +192,20 @@ const CURRENCY_FAST_FRAC: u16 = (cfg!(feature = "currency-frac-0") as u16)
 // 速い経路は小数 0〜8 桁だけ（dispatch_d! の腕）
 const _: () = assert!(NUMBER_FAST_FRAC < 1 << 9 && CURRENCY_FAST_FRAC < 1 << 9);
 
-/// 数値の書式（検証・前計算済み）
+/// 1 回の書き出しで増えうる最大バイト数。`sign` は符号（数値なら負符号、通貨なら前後の文字列）の最大長
+fn max_len(sign: usize, group: &str, decimal: &str) -> usize {
+    // 数字は最大 20 桁（u64）＋0 の補い 1 桁。区切りは数字の数より少ない
+    sign + 21 + 20 * group.len() + decimal.len()
+}
+
+/// 通貨の前後の文字列の長さの最大（正と負のうち長いほう）
+fn affix_len(nonneg: [&str; 2], neg: [&str; 2]) -> usize {
+    (nonneg[0].len() + nonneg[1].len()).max(neg[0].len() + neg[1].len())
+}
+
+/// 数値の書式（検証・前計算済み）。`E` は部品の符号化（既定は [`Plain`]）
 #[derive(Debug, Clone)]
-pub struct NumberFormat<'a> {
+pub struct NumberFormat<'a, E: Encoding = Plain> {
     decimal: Cow<'a, str>,
     group: Cow<'a, str>,
     /// 負符号（負の値の前にだけ付ける）
@@ -185,6 +218,7 @@ pub struct NumberFormat<'a> {
     kernel: Kernel,
     /// 1 回の書き出しで増えうる最大バイト数（unsafe な書き込みの上限）
     max_len: usize,
+    encoding: PhantomData<E>,
 }
 
 impl<'a> NumberFormat<'a> {
@@ -218,8 +252,7 @@ impl<'a> NumberFormat<'a> {
             (true, 2, 2) if GROUP2 && mg_ok => Kernel::G22,
             _ => Kernel::Generic,
         };
-        // 数字は最大 20 桁（u64）＋0 の補い 1 桁。区切りは数字の数より少ない
-        let max_len = p.minus_sign.len() + 21 + 20 * p.group.len() + p.decimal.len();
+        let max_len = max_len(p.minus_sign.len(), &p.group, &p.decimal);
         Ok(NumberFormat {
             decimal: p.decimal,
             group: p.group,
@@ -230,9 +263,12 @@ impl<'a> NumberFormat<'a> {
             frac: p.frac_digits,
             kernel,
             max_len,
+            encoding: PhantomData,
         })
     }
+}
 
+impl<E: Encoding> NumberFormat<'_, E> {
     /// 小数桁数（値のスケール）
     pub fn frac_digits(&self) -> u8 {
         self.frac
@@ -411,9 +447,9 @@ impl<'a> NumberFormat<'a> {
     }
 }
 
-/// 通貨の書式（検証・前計算済み）
+/// 通貨の書式（検証・前計算済み）。`E` は部品の符号化（既定は [`Plain`]）
 #[derive(Debug, Clone)]
-pub struct CurrencyFormat<'a> {
+pub struct CurrencyFormat<'a, E: Encoding = Plain> {
     decimal: Cow<'a, str>,
     group: Cow<'a, str>,
     /// 非負の値の [前, 後]
@@ -428,6 +464,7 @@ pub struct CurrencyFormat<'a> {
     kernel: Kernel,
     /// 1 回の書き出しで増えうる最大バイト数（unsafe な書き込みの上限）
     max_len: usize,
+    encoding: PhantomData<E>,
 }
 
 impl<'a> CurrencyFormat<'a> {
@@ -461,10 +498,14 @@ impl<'a> CurrencyFormat<'a> {
             (true, 2, 2) if GROUP2 && mg_ok => Kernel::G22,
             _ => Kernel::Generic,
         };
-        let aff = (p.positive_prefix.len() + p.positive_suffix.len())
-            .max(p.negative_prefix.len() + p.negative_suffix.len());
-        // 数字は最大 20 桁（u64）＋0 の補い 1 桁。区切りは数字の数より少ない
-        let max_len = aff + 21 + 20 * p.group.len() + p.decimal.len();
+        let max_len = max_len(
+            affix_len(
+                [&p.positive_prefix, &p.positive_suffix],
+                [&p.negative_prefix, &p.negative_suffix],
+            ),
+            &p.group,
+            &p.decimal,
+        );
         Ok(CurrencyFormat {
             decimal: p.decimal,
             group: p.group,
@@ -476,9 +517,12 @@ impl<'a> CurrencyFormat<'a> {
             frac: p.frac_digits,
             kernel,
             max_len,
+            encoding: PhantomData,
         })
     }
+}
 
+impl<E: Encoding> CurrencyFormat<'_, E> {
     /// 小数桁数（値のスケール）
     pub fn frac_digits(&self) -> u8 {
         self.frac
