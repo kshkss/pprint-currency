@@ -11,6 +11,8 @@
 //! - 値は「小数桁数をスケールとする整数」で渡す（例: 小数 2 桁なら 1234.56 → 123456）。
 //!   丸めは行わない。
 //! - 数字は ASCII（0-9）のみ。
+//! - feature `hypertext` を有効にすると、`encode_html` で HTML 用に変換した書式を
+//!   hypertext のテンプレートへ直接書き出せる（`Html` と `Formatted` を参照）。
 //!
 //! ```
 //! use pprint_currency::{CurrencyFormat, CurrencyParams, NumberFormat, NumberParams};
