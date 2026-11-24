@@ -202,6 +202,121 @@ fn rejects_invalid_params() {
     );
 }
 
+/// write_* は、中身のある String の末尾に追記し、前の中身を壊さないこと（速い経路・遅い経路、i32・i64 の両方）
+#[test]
+fn write_appends_to_existing_string() {
+    // (グループ幅, 小数桁数): 3 桁区切り・インド式は（features が有効なら）速い経路、(4, 4) と小数 11 桁は遅い経路
+    let cases: [(Grouping, u8); 4] = [
+        (3.into(), 2),
+        ((3, 2).into(), 0),
+        (4.into(), 2),
+        (3.into(), 11),
+    ];
+    let vals: [i64; 8] = [
+        0,
+        5,
+        -5,
+        1234567,
+        -1234567,
+        i32::MAX as i64,
+        i32::MIN as i64,
+        i64::MIN,
+    ];
+    for (g, d) in cases {
+        let num = NumberFormat::new(NumberParams {
+            decimal: ".".into(),
+            group: "\u{202f}".into(),
+            grouping: g,
+            min_grouping: 1,
+            frac_digits: d,
+            minus_sign: "−".into(),
+        })
+        .unwrap();
+        let cur = CurrencyFormat::new(CurrencyParams {
+            decimal: ",".into(),
+            group: ".".into(),
+            grouping: g,
+            min_grouping: 1,
+            frac_digits: d,
+            positive_prefix: "￥".into(),
+            positive_suffix: " 円".into(),
+            negative_prefix: "−￥".into(),
+            negative_suffix: " 円".into(),
+        })
+        .unwrap();
+
+        // 書き方ごとに: (中身のある String に追記する関数, 期待する文字列)
+        type Writer<'f> = Box<dyn Fn(&mut String, i64) -> Option<String> + 'f>;
+        let writers: [(&str, Writer); 4] = [
+            (
+                "number i64",
+                Box::new(|s, v| {
+                    num.write_i64(s, v);
+                    Some(num.format_i64(v))
+                }),
+            ),
+            (
+                "number i32",
+                Box::new(|s, v| {
+                    let v = i32::try_from(v).ok()?;
+                    num.write_i32(s, v);
+                    Some(num.format_i32(v))
+                }),
+            ),
+            (
+                "currency i64",
+                Box::new(|s, v| {
+                    cur.write_i64(s, v);
+                    Some(cur.format_i64(v))
+                }),
+            ),
+            (
+                "currency i32",
+                Box::new(|s, v| {
+                    let v = i32::try_from(v).ok()?;
+                    cur.write_i32(s, v);
+                    Some(cur.format_i32(v))
+                }),
+            ),
+        ];
+
+        for (name, write) in &writers {
+            let ctx = format!("{name} {g:?} d={d}");
+            // 1 回ずつ、ASCII とマルチバイト文字で終わる中身の後ろに書く
+            for head in ["前", "￥", "abc"] {
+                for &v in &vals {
+                    let mut s = String::from(head);
+                    if let Some(want) = write(&mut s, v) {
+                        assert_eq!(s, format!("{head}{want}"), "{ctx} head={head} {v}");
+                    }
+                }
+            }
+            // 同じ String に続けて書くと、全部がつながる
+            let mut s = String::from("前");
+            let mut want = String::from("前");
+            for &v in &vals {
+                if let Some(w) = write(&mut s, v) {
+                    want.push_str(&w);
+                    want.push('|');
+                    s.push('|');
+                }
+            }
+            assert_eq!(s, want, "{ctx} 連続");
+            // 容量いっぱいの String（書くときに再確保が起きる）
+            for &v in &vals {
+                let mut s = String::with_capacity(16);
+                while s.len() < s.capacity() {
+                    s.push('x');
+                }
+                let head = s.clone();
+                if let Some(want) = write(&mut s, v) {
+                    assert_eq!(s, format!("{head}{want}"), "{ctx} 容量いっぱい {v}");
+                }
+            }
+        }
+    }
+}
+
 /// tools/gen.py --rust が出力する形の定数（Cow::Borrowed と Grouping::new）が書けて、そのまま使えること
 #[test]
 fn const_params_like_gen_py_output() {
