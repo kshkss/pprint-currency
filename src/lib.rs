@@ -31,6 +31,8 @@
 //! assert_eq!(de.format_i32(123456), "1.234,56");
 //! ```
 
+#[cfg(feature = "hypertext")]
+mod hypertext;
 #[macro_use]
 mod kernel;
 mod pattern;
@@ -39,6 +41,9 @@ use std::borrow::Cow;
 use std::marker::PhantomData;
 
 pub use crate::pattern::{CurrencyPattern, NumberPattern, PatternError};
+
+#[cfg(feature = "hypertext")]
+pub use crate::hypertext::{Formatted, Html};
 
 use crate::kernel::{
     count_digits, grouped32, grouped64, Fwd, Kernel, Raw, GROUP2, GROUP3, INDIAN, MIN_GROUP1,
