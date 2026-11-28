@@ -1,6 +1,9 @@
 //! 書式文字列（UTS #35 / ICU の DecimalFormat パターンと同じ構文）から書式を作る
 
-use std::borrow::Cow;
+use alloc::borrow::Cow;
+use alloc::format;
+use alloc::string::String;
+use alloc::vec::Vec;
 
 use crate::{CurrencyFormat, CurrencyParams, FormatError, Grouping, NumberFormat, NumberParams};
 
@@ -91,8 +94,8 @@ pub enum PatternError {
     Format(FormatError),
 }
 
-impl std::fmt::Display for PatternError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for PatternError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             PatternError::Unexpected { ch, pos } => {
                 write!(f, "書式文字列の {pos} バイト目の {ch:?} を解釈できません")
@@ -104,8 +107,8 @@ impl std::fmt::Display for PatternError {
     }
 }
 
-impl std::error::Error for PatternError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl core::error::Error for PatternError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
             PatternError::Format(e) => Some(e),
             _ => None,
