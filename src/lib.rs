@@ -11,6 +11,7 @@
 //! - 値は「小数桁数をスケールとする整数」で渡す（例: 小数 2 桁なら 1234.56 → 123456）。
 //!   丸めは行わない。
 //! - 数字は ASCII（0-9）のみ。
+//! - `#![no_std]` で、`alloc` があれば動く（組み込みや WASM でも使える）。std の環境でもそのまま使える。
 //! - feature `hypertext` を有効にすると、`encode_html` で HTML 用に変換した書式を
 //!   hypertext のテンプレートへ直接書き出せる（`Html` と `Formatted` を参照）。
 //!
@@ -33,14 +34,19 @@
 //! assert_eq!(de.format_i32(123456), "1.234,56");
 //! ```
 
+#![no_std]
+
+extern crate alloc;
+
 #[cfg(feature = "hypertext")]
 mod hypertext;
 #[macro_use]
 mod kernel;
 mod pattern;
 
-use std::borrow::Cow;
-use std::marker::PhantomData;
+use alloc::borrow::Cow;
+use alloc::string::String;
+use core::marker::PhantomData;
 
 pub use crate::pattern::{CurrencyPattern, NumberPattern, PatternError};
 
@@ -58,7 +64,7 @@ mod sealed {
 
 /// 書式の部品（小数点・区切り・負符号・前後の文字列）がどう符号化されているかを表す型。
 /// [`NumberFormat`] / [`CurrencyFormat`] の型引数に使う
-pub trait Encoding: sealed::Sealed + std::fmt::Debug + Clone + Copy {}
+pub trait Encoding: sealed::Sealed + core::fmt::Debug + Clone + Copy {}
 
 /// 部品をそのまま書き出す（既定）
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -79,8 +85,8 @@ pub enum FormatError {
     GroupingTooLarge,
 }
 
-impl std::fmt::Display for FormatError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for FormatError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str(match self {
             FormatError::FracDigitsTooLarge => "小数桁数は 19 以下にしてください",
             FormatError::MinGroupingZero => "min_grouping は 1 以上にしてください",
@@ -89,7 +95,7 @@ impl std::fmt::Display for FormatError {
         })
     }
 }
-impl std::error::Error for FormatError {}
+impl core::error::Error for FormatError {}
 
 /// グループ幅。`u8` なら全グループが同じ幅、`(u8, u8)` なら（第1グループ＝右端, 第2グループ以降）の幅
 ///

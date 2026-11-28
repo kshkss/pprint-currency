@@ -3,8 +3,8 @@
 //! 書式を [`NumberFormat::encode_html`] / [`CurrencyFormat::encode_html`] で HTML 用に変換しておき、
 //! `with_i32` / `with_i64` で値と組にすると、テンプレートのバッファへ直接書き出せる。
 
-use std::borrow::Cow;
-use std::marker::PhantomData;
+use alloc::borrow::Cow;
+use core::marker::PhantomData;
 
 use hypertext::{Buffer, Renderable, context::Node};
 
