@@ -6,9 +6,9 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
-use hypertext::{context::Node, Buffer, Renderable};
+use hypertext::{Buffer, Renderable, context::Node};
 
-use crate::{affix_len, max_len, sealed, CurrencyFormat, Encoding, NumberFormat};
+use crate::{CurrencyFormat, Encoding, NumberFormat, affix_len, max_len, sealed};
 
 /// 部品を HTML（本文）向けにエスケープ済み。[`NumberFormat::encode_html`] / [`CurrencyFormat::encode_html`] で作る
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
