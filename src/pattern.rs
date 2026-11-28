@@ -216,6 +216,8 @@ impl<'s> Scanner<'s> {
     fn affix(&mut self, symbol: &str, minus: &str, side: Side) -> Result<String, PatternError> {
         let mut out = String::new();
         // 数値部の直後の E は指数の書式
+        // まとめるには let chains（Rust 1.88〜）が要るので、ネストのままにする
+        #[allow(clippy::collapsible_if)]
         if side == Side::Suffix {
             if let Some((pos, 'E')) = self.peek() {
                 return Err(PatternError::Unexpected { ch: 'E', pos });
