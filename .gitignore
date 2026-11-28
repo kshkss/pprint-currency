@@ -27,3 +27,6 @@ rustc-ice-*.txt
 /tests/cldr_params.json
 /tests/golden.json
 __pycache__/
+
+.serena
+graphify-out
