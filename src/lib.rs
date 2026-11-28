@@ -48,8 +48,8 @@ pub use crate::pattern::{CurrencyPattern, NumberPattern, PatternError};
 pub use crate::hypertext::{Formatted, Html};
 
 use crate::kernel::{
-    count_digits, grouped32, grouped64, Fwd, Kernel, Raw, GROUP2, GROUP3, INDIAN, MIN_GROUP1,
-    MIN_GROUP2, MIN_GROUP3,
+    Fwd, GROUP2, GROUP3, INDIAN, Kernel, MIN_GROUP1, MIN_GROUP2, MIN_GROUP3, Raw, count_digits,
+    grouped32, grouped64,
 };
 
 mod sealed {

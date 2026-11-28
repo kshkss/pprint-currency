@@ -12,7 +12,9 @@ fn json(path: &str) -> Value {
 fn data() -> Option<(Value, Value)> {
     let (p, g) = ("tests/cldr_params.json", "tests/golden.json");
     if !std::path::Path::new(p).exists() || !std::path::Path::new(g).exists() {
-        eprintln!("{p} / {g} が無いので Intl との照合を省略します（tools/gen.py と tools/golden.js で生成できます）");
+        eprintln!(
+            "{p} / {g} が無いので Intl との照合を省略します（tools/gen.py と tools/golden.js で生成できます）"
+        );
         return None;
     }
     Some((json(p), json(g)))

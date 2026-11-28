@@ -1,7 +1,7 @@
 //! hypertext の Renderable 対応（feature "hypertext"）
 #![cfg(feature = "hypertext")]
 
-use hypertext::{prelude::*, Buffer};
+use hypertext::{Buffer, prelude::*};
 use pprint_currency::{CurrencyFormat, CurrencyParams, Grouping, Html, NumberFormat, NumberParams};
 
 fn number(group: &str, decimal: &str, minus: &str, g: Grouping, d: u8) -> NumberFormat<'static> {

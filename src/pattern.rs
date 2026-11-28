@@ -301,7 +301,7 @@ impl<'s> Scanner<'s> {
                     '0' if !seen_hash => {}
                     '#' => seen_hash = true,
                     '0'..='9' | ',' | '.' | '@' => {
-                        return Err(PatternError::Unexpected { ch: c, pos })
+                        return Err(PatternError::Unexpected { ch: c, pos });
                     }
                     _ => break,
                 }
