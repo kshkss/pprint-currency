@@ -1,7 +1,7 @@
 [package]
 name = "pprint-currency"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "固定小数点の整数を、ロケールの書式（区切り・小数点・通貨記号）で高速に文字列にする"
 repository = "https://github.com/kshkss/pprint-currency"
 license = "MIT"
