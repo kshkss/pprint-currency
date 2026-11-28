@@ -23,7 +23,7 @@ const LUT: &[u8; 200] = b"0001020304050607080910111213141516171819\
 /// 小数桁数（実行時の値）から、定数にした実装を選ぶ
 macro_rules! dispatch_d {
     // $mask はコンパイル時定数（速い経路で扱う小数桁数の集合）。集合にない桁数の腕は最適化で消える
-    ($mask:expr, $d:expr, |$D:ident| $call:expr) => {
+    ($mask:expr_2021, $d:expr_2021, |$D:ident| $call:expr_2021) => {
         match $d {
             0 if $mask & (1 << 0) != 0 => { const $D: usize = 0; $call }
             1 if $mask & (1 << 1) != 0 => { const $D: usize = 1; $call }
