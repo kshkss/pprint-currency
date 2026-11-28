@@ -5,6 +5,9 @@ edition = "2021"
 description = "固定小数点の整数を、ロケールの書式（区切り・小数点・通貨記号）で高速に文字列にする"
 repository = "https://github.com/kshkss/pprint-currency"
 license = "MIT"
+exclude = [".github"]
+keywords = ["currency", "number", "formatting", "separator", "thousands"]
+categories = ["value-formatting", "internationalization", "localization"]
 
 [features]
 # 速い経路（特殊化）の有無。どれを切っても出力は同じで、切った分は遅い経路（FBL 方式）で処理される。
