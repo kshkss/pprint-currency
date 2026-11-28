@@ -75,56 +75,75 @@ pub(crate) struct Raw {
 impl Raw {
     #[inline(always)]
     unsafe fn b(&mut self, x: u8) {
-        *self.p = x;
-        self.p = self.p.add(1);
+        // SAFETY: 呼び出し側が、p から少なくとも 1 バイトを書き込める領域を reserve している
+        // （Raw の前提）。書いた直後の p + 1 は、確保した領域の中か末尾の 1 つ先を指す
+        unsafe {
+            *self.p = x;
+            self.p = self.p.add(1);
+        }
     }
     #[inline(always)]
     pub(crate) unsafe fn s(&mut self, s: &[u8]) {
         for &x in s {
-            self.b(x)
+            // SAFETY: s.len() バイト分の領域は呼び出し側が reserve している
+            unsafe { self.b(x) }
         }
     }
     #[inline(always)]
     unsafe fn pair(&mut self, v: u32) {
         let i = v as usize * 2;
-        self.b(LUT[i]);
-        self.b(LUT[i + 1]);
+        // SAFETY: 2 バイト分の領域は呼び出し側が reserve している
+        unsafe {
+            self.b(LUT[i]);
+            self.b(LUT[i + 1]);
+        }
     }
     /// ちょうど N 桁（v < 10^N、N <= 9）。2 桁ずつ、奇数なら残り 1 桁
     #[inline(always)]
     unsafe fn fixed<const N: usize>(&mut self, mut v: u32) {
-        let end = self.p.add(N);
+        // SAFETY: [p, p + N) は呼び出し側が reserve している領域なので、p + N はその中か末尾の 1 つ先
+        let end = unsafe { self.p.add(N) };
         let mut q = end;
         let mut i = 0;
         while i + 2 <= N {
-            q = q.sub(2);
-            let j = (v % 100) as usize * 2;
-            *q = LUT[j];
-            *q.add(1) = LUT[j + 1];
+            // SAFETY: q は end から 2 ずつ下がり、ここまでに下がった量は i <= N - 2 なので、
+            // q - 2 は p を下回らない。q - 2 と q - 1 は [p, p + N) の中
+            unsafe {
+                q = q.sub(2);
+                let j = (v % 100) as usize * 2;
+                *q = LUT[j];
+                *q.add(1) = LUT[j + 1];
+            }
             v /= 100;
             i += 2;
         }
         if N % 2 == 1 {
-            q = q.sub(1);
-            *q = b'0' + v as u8;
+            // SAFETY: N が奇数なら、ループの後の q は p + 1 なので、q - 1 = p は領域の中
+            unsafe {
+                q = q.sub(1);
+                *q = b'0' + v as u8;
+            }
         }
         self.p = end;
     }
     /// v < 10^4 を先頭の 0 なしで（branchlut と同じく比較で分岐）
     #[inline(always)]
     unsafe fn lead4(&mut self, v: u32) {
-        if v >= 100 {
-            if v >= 1000 {
-                self.pair(v / 100);
-                self.pair(v % 100);
+        // SAFETY: 書くのは最大 4 バイトで、その分は呼び出し側が reserve している
+        unsafe {
+            if v >= 100 {
+                if v >= 1000 {
+                    self.pair(v / 100);
+                    self.pair(v % 100);
+                } else {
+                    self.b(b'0' + (v / 100) as u8);
+                    self.pair(v % 100);
+                }
+            } else if v >= 10 {
+                self.pair(v)
             } else {
-                self.b(b'0' + (v / 100) as u8);
-                self.pair(v % 100);
+                self.b(b'0' + v as u8)
             }
-        } else if v >= 10 {
-            self.pair(v)
-        } else {
-            self.b(b'0' + v as u8)
         }
     }
 }
@@ -208,16 +227,20 @@ pub(crate) struct Fwd<'a> {
 impl Fwd<'_> {
     #[inline(always)]
     pub(crate) unsafe fn digit(&mut self, c: u8) {
-        self.w.b(c);
+        // SAFETY: 数字・区切り・小数点を合わせた書き込み量は max_len 以内で、
+        // その分は呼び出し側が reserve している
+        unsafe { self.w.b(c) };
         if self.int_left > 0 {
             self.int_left -= 1;
             self.grp_left -= 1;
             if self.int_left == 0 {
                 if self.has_frac {
-                    self.w.s(self.decimal);
+                    // SAFETY: 上と同じ（小数点の分も max_len に含まれる）
+                    unsafe { self.w.s(self.decimal) };
                 }
             } else if self.grp_left == 0 {
-                self.w.s(self.group);
+                // SAFETY: 上と同じ（区切りの分も max_len に含まれる）
+                unsafe { self.w.s(self.group) };
                 self.grp_left = if self.int_left == self.primary {
                     self.primary
                 } else {
@@ -229,56 +252,74 @@ impl Fwd<'_> {
     #[inline(always)]
     unsafe fn pair(&mut self, i: u32) {
         let i = i as usize * 2;
-        self.digit(LUT[i]);
-        self.digit(LUT[i + 1]);
+        // SAFETY: 書き込み量は max_len 以内で、その分は呼び出し側が reserve している
+        unsafe {
+            self.digit(LUT[i]);
+            self.digit(LUT[i + 1]);
+        }
     }
     /// v < 10^4 を先頭の 0 なしで（branchlut の if (v >= 1000) ... の分岐）
     #[inline(always)]
     unsafe fn lead4(&mut self, v: u32) {
         let (d1, d2) = ((v / 100) as usize * 2, (v % 100) as usize * 2);
-        if v >= 1000 {
-            self.digit(LUT[d1]);
+        // SAFETY: 書き込み量は max_len 以内で、その分は呼び出し側が reserve している
+        unsafe {
+            if v >= 1000 {
+                self.digit(LUT[d1]);
+            }
+            if v >= 100 {
+                self.digit(LUT[d1 + 1]);
+            }
+            if v >= 10 {
+                self.digit(LUT[d2]);
+            }
+            self.digit(LUT[d2 + 1]);
         }
-        if v >= 100 {
-            self.digit(LUT[d1 + 1]);
-        }
-        if v >= 10 {
-            self.digit(LUT[d2]);
-        }
-        self.digit(LUT[d2 + 1]);
     }
     #[inline(always)]
     unsafe fn full4(&mut self, v: u32) {
-        self.pair(v / 100);
-        self.pair(v % 100);
+        // SAFETY: 書き込み量は max_len 以内で、その分は呼び出し側が reserve している
+        unsafe {
+            self.pair(v / 100);
+            self.pair(v % 100);
+        }
     }
     #[inline(always)]
     unsafe fn lead8(&mut self, v: u32) {
-        if v < 10_000 {
-            self.lead4(v)
-        } else {
-            self.lead4(v / 10_000);
-            self.full4(v % 10_000);
+        // SAFETY: 書き込み量は max_len 以内で、その分は呼び出し側が reserve している
+        unsafe {
+            if v < 10_000 {
+                self.lead4(v)
+            } else {
+                self.lead4(v / 10_000);
+                self.full4(v % 10_000);
+            }
         }
     }
     #[inline(always)]
     unsafe fn full8(&mut self, v: u32) {
-        self.full4(v / 10_000);
-        self.full4(v % 10_000);
+        // SAFETY: 書き込み量は max_len 以内で、その分は呼び出し側が reserve している
+        unsafe {
+            self.full4(v / 10_000);
+            self.full4(v % 10_000);
+        }
     }
     /// branchlut の u64 の分岐（10^8, 10^16 で 3 通り）で、上の桁から書く
     #[inline(always)]
     pub(crate) unsafe fn u64(&mut self, v: u64) {
-        if v < 100_000_000 {
-            self.lead8(v as u32)
-        } else if v < 10_000_000_000_000_000 {
-            self.lead8((v / 100_000_000) as u32);
-            self.full8((v % 100_000_000) as u32);
-        } else {
-            self.lead4((v / 10_000_000_000_000_000) as u32);
-            let r = v % 10_000_000_000_000_000;
-            self.full8((r / 100_000_000) as u32);
-            self.full8((r % 100_000_000) as u32);
+        // SAFETY: 書くのは最大 20 桁と区切り・小数点で、max_len 以内。その分は呼び出し側が reserve している
+        unsafe {
+            if v < 100_000_000 {
+                self.lead8(v as u32)
+            } else if v < 10_000_000_000_000_000 {
+                self.lead8((v / 100_000_000) as u32);
+                self.full8((v % 100_000_000) as u32);
+            } else {
+                self.lead4((v / 10_000_000_000_000_000) as u32);
+                let r = v % 10_000_000_000_000_000;
+                self.full8((r / 100_000_000) as u32);
+                self.full8((r % 100_000_000) as u32);
+            }
         }
     }
 }
@@ -307,24 +348,37 @@ macro_rules! bodies {
                     rest /= POW10[S] as $t;
                     k += 1;
                 }
-                w.lead4(rest as u32);
-                while k > 0 {
-                    k -= 1;
+                // SAFETY: 書くのは整数部の数字と区切りで、小数部と合わせて max_len 以内。
+                // その分は呼び出し側が reserve している（rest < 10^S <= 10^4、ch[k] < 10^S、low < 10^P）
+                unsafe {
+                    w.lead4(rest as u32);
+                    while k > 0 {
+                        k -= 1;
+                        w.s(g);
+                        w.fixed::<S>(ch[k]);
+                    }
                     w.s(g);
-                    w.fixed::<S>(ch[k]);
+                    w.fixed::<P>(low);
                 }
-                w.s(g);
-                w.fixed::<P>(low);
             } else if MIN_GROUP3 && int >= 10_000 {
                 // 区切らない整数部は 10^(P + mg - 1) 未満。P = 3、mg = 3 のときだけ 5 桁になりうる
-                w.b(b'0' + (int / 10_000) as u8);
-                w.fixed::<4>((int % 10_000) as u32);
+                // SAFETY: 書くのは 5 バイトで、max_len 以内。その分は呼び出し側が reserve している
+                unsafe {
+                    w.b(b'0' + (int / 10_000) as u8);
+                    w.fixed::<4>((int % 10_000) as u32);
+                }
             } else {
-                w.lead4(int as u32);
+                // SAFETY: int < 10^4 なので書くのは最大 4 バイトで、max_len 以内。
+                // その分は呼び出し側が reserve している
+                unsafe { w.lead4(int as u32) };
             }
             if D > 0 {
-                w.s(dec);
-                w.fixed::<D>(frac);
+                // SAFETY: 書くのは小数点と D 桁（frac < 10^D）で、max_len 以内。
+                // その分は呼び出し側が reserve している
+                unsafe {
+                    w.s(dec);
+                    w.fixed::<D>(frac);
+                }
             }
         }
     };
